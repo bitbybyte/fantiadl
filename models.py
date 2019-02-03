@@ -18,6 +18,8 @@ class FantiaDownloader:
     POST_API = "https://fantia.jp/api/v1/posts/{}"
     POSTS_URL = "https://fantia.jp/posts"
     POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
+    FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
+
 
     def __init__(self, session_id, chunk_size=1024, dump_metadata=False, directory=None, quiet=True):
         self.session_id = session_id
@@ -81,7 +83,7 @@ class FantiaDownloader:
 
 
     def download_video(self, post, post_directory):
-        filename = post["filename"]
+        filename = os.path.join(post_directory, post["filename"])
         download_url = urljoin(self.POSTS_URL, post["download_uri"])
         self.perform_download(download_url, filename)
 

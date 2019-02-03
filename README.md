@@ -25,6 +25,5 @@ download options:
 
 ## Roadmap
  - Custom filename templating
- - Download a single post by ID
  - Login from CLI or .netrc
  - Progress and ETA during downloading
