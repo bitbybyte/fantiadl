@@ -8,7 +8,6 @@ Download media and other data from Fantia. A session key value must be provided 
  - requests
 
 ## Roadmap
- - Download text, tags, and other metadata from posts
  - Build proper CLI
  - Custom filename and directory name templating
  - Download a single post by ID

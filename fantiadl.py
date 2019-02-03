@@ -103,8 +103,16 @@ class FantiaDownloader:
         post_contents = post_json["post_contents"]
         post_directory = sanitize_for_path(str(post_id) + " - " + post_title)
         os.mkdir(post_directory)
+        self.dump_metadata(post_json, post_directory)
         for post in post_contents:
             self.download_post_content(post, post_directory)
+
+
+    def dump_metadata(self, metadata, directory):
+        filename = os.path.join(directory, "metadata.json")
+        with open(filename, "w") as file:
+            json.dump(metadata, file, sort_keys=True, indent=4)
+
 
 
 class FantiaClub:
