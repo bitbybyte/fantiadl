@@ -8,7 +8,7 @@ import sys
 from models import FantiaDownloader, FantiaClub
 
 __author__ = "bitbybyte"
-__copyright__ = "Copyright 2018 bitbybyte"
+__copyright__ = "Copyright 2019 bitbybyte"
 
 __license__ = "MIT"
 __version__ = "1.0"
