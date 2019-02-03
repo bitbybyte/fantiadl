@@ -26,4 +26,3 @@ download options:
 ## Roadmap
  - Custom filename templating
  - Login from CLI or .netrc
- - Progress and ETA during downloading

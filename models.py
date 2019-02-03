@@ -21,7 +21,7 @@ class FantiaDownloader:
     FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
 
 
-    def __init__(self, session_id, chunk_size=1024, dump_metadata=False, directory=None, quiet=True):
+    def __init__(self, session_id, chunk_size=1024*1024*5, dump_metadata=False, directory=None, quiet=True):
         self.session_id = session_id
         self.chunk_size = chunk_size
         self.dump_metadata = dump_metadata
@@ -33,13 +33,15 @@ class FantiaDownloader:
 
     def output(self, output):
         if not self.quiet:
-            print(output)
+            sys.stdout.write(output)
+            sys.stdout.flush()
 
 
     def login(self):
         session_cookie = {
             "_session_id" : self.session_id
         }
+
         requests.utils.add_dict_to_cookiejar(self.session.cookies, session_cookie)
         response = self.session.get(self.ME_API)
         if not response.status_code == 200:
@@ -69,9 +71,19 @@ class FantiaDownloader:
     def perform_download(self, url, filename):
         request = self.session.get(url, stream=True)
         request.raise_for_status()
+
+        file_size = int(request.headers["Content-Length"])
+        self.output("File: {}\n".format(filename))
+
+        downloaded = 0
         with open(filename, "wb") as file:
             for chunk in request.iter_content(self.chunk_size):
+                downloaded += len(chunk)
                 file.write(chunk)
+                done = int(25 * downloaded / file_size)
+                percent = int(100 * downloaded / file_size)
+                self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
+        self.output("\n")
 
 
     def download_photo(self, photo, photo_counter, gallery_directory):
@@ -108,7 +120,7 @@ class FantiaDownloader:
         post_json = json.loads(response.text)["post"]
         post_id = post_json["id"]
         post_creator = post_json["fanclub"]["creator_name"]
-        self.output(post_id)
+        self.output("Downloading post {}...\n".format(post_id))
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
         # TODO: Assign base directory to class
