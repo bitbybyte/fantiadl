@@ -1,15 +1,19 @@
 # FantiaDL
-Download media and other data from Fantia. A session key value must be provided by the user from the `_session_id` cookie stored when logged in to Fantia.
+Download media and other data from Fantia fanclubs and posts. An email and password must be provided using the -e and -p arguments.
 
 ```
-usage: fantiadl.py session_key url
+usage: fantiadl.py [options] url
 
 positional arguments:
-  session_key           session key
   url                   fanclub or post URL
 
 optional arguments:
   -h, --help            show this help message and exit
+  -e EMAIL, --email EMAIL
+                        fantia email
+  -p PASSWORD, --password PASSWORD
+                        fantia password
+  -n, --netrc           login with .netrc
   -q, --quiet           suppress output
   -v, --version         show program's version number and exit
 
@@ -18,11 +22,13 @@ download options:
                         directory to download to
   -m, --dump-metadata   store metadata to file
 ```
+## Download
+Check the [releases page](/releases/latest) for the latest binaries.
 
-## Requirements
+## Build Requirements
  - Python 3.x
  - requests
 
 ## Roadmap
  - Custom filename templating
- - Login from CLI or .netrc
+ - More robust logging

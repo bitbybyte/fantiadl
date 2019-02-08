@@ -12,17 +12,24 @@ import sys
 
 
 class FantiaDownloader:
-    ME_API = "https://fantia.jp/api/v1/me"
-    FANCLUB_API = "https://fantia.jp/api/v1/fanclubs/{}"
-    FANCLUB_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
-    POST_API = "https://fantia.jp/api/v1/posts/{}"
-    POSTS_URL = "https://fantia.jp/posts"
-    POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
     FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
 
+    LOGIN_URL = "https://fantia.jp/auth/login"
+    LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}"
 
-    def __init__(self, session_id, chunk_size=1024*1024*5, dump_metadata=False, directory=None, quiet=True):
-        self.session_id = session_id
+    ME_API = "https://fantia.jp/api/v1/me"
+
+    FANCLUB_API = "https://fantia.jp/api/v1/fanclubs/{}"
+    FANCLUB_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
+
+    POST_API = "https://fantia.jp/api/v1/posts/{}"
+    POST_URL = "https://fantia.jp/posts"
+    POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
+
+
+    def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, directory=None, quiet=True):
+        self.email = email
+        self.password = password
         self.chunk_size = chunk_size
         self.dump_metadata = dump_metadata
         self.directory = directory or ""
@@ -38,14 +45,31 @@ class FantiaDownloader:
 
 
     def login(self):
-        session_cookie = {
-            "_session_id" : self.session_id
+        login = self.session.get(self.LOGIN_URL)
+        auth_url = login.url.replace("id.fantia.jp/auth/", "id.fantia.jp/authorize")
+
+        login_json = {
+            "Email": self.email,
+            "Password": self.password
         }
 
-        requests.utils.add_dict_to_cookiejar(self.session.cookies, session_cookie)
-        response = self.session.get(self.ME_API)
-        if not response.status_code == 200:
-            sys.exit("Invalid session key")
+        login_headers = {
+            "X-Not-Redirection": "true"
+        }
+
+        auth_response = self.session.post(auth_url, json=login_json, headers=login_headers).json()
+        if auth_response["status"] == "OK":
+            auth_payload = auth_response["payload"]
+
+            callback = self.session.get(self.LOGIN_CALLBACK_URL.format(auth_payload["code"], auth_payload["state"]))
+            if not callback.cookies["_session_id"]:
+                sys.exit("Error: Failed to retrieve session key from callback")
+
+            check_user = self.session.get(self.ME_API)
+            if not check_user.status_code == 200:
+                sys.exit("Error: Invalid session")
+        else:
+            sys.exit("Error: Failed to login. Please verify your username and password")
 
 
     def download_fanclub_posts(self, fanclub):
@@ -96,7 +120,7 @@ class FantiaDownloader:
 
     def download_video(self, post, post_directory):
         filename = os.path.join(post_directory, post["filename"])
-        download_url = urljoin(self.POSTS_URL, post["download_uri"])
+        download_url = urljoin(self.POST_URL, post["download_uri"])
         self.perform_download(download_url, filename)
 
 
@@ -146,13 +170,3 @@ class FantiaClub:
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
     return re.sub(r'[<>\"\?\\\/\*:]', replace, value)
-
-
-if __name__ == "__main__":
-    if (len(sys.argv) != 3):
-        sys.exit("Usage: fantiadl.py [session_key] [fanclub_id]")
-
-    downloader = FantiaDownloader(sys.argv[1])
-    fanclub = FantiaClub(sys.argv[2])
-
-    downloader.download_fanclub_posts(fanclub)
