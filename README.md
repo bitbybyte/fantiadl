@@ -23,7 +23,7 @@ download options:
   -m, --dump-metadata   store metadata to file
 ```
 ## Download
-Check the [releases page](/releases/latest) for the latest binaries.
+Check the [releases page](https://github.com/bitbybyte/fantiadl/releases/latest) for the latest binaries.
 
 ## Build Requirements
  - Python 3.x
