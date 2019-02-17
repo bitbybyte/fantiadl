@@ -53,12 +53,12 @@ if __name__ == "__main__":
 
     downloader = FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet)
 
-    url_groups = downloader.FANTIA_URL_RE.match(cmdl_opts.url)
+    url_groups = downloader.FANTIA_URL_RE.match(cmdl_opts.url).groups()
     if url_groups:
-        if url_groups[1] == "fanclubs":
-            fanclub = FantiaClub(url_groups[2])
+        if url_groups[0] == "fanclubs":
+            fanclub = FantiaClub(url_groups[1])
             downloader.download_fanclub_posts(fanclub)
-        elif url_groups[1] == "posts":
-            downloader.download_post(url_groups[2])
+        elif url_groups[0] == "posts":
+            downloader.download_post(url_groups[1])
     else:
         sys.exit("Please provide a valid Fantia URL (/posts/[id], /fanclubs/[id])")
