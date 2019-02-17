@@ -4,6 +4,7 @@
 import requests
 
 from urllib.parse import urljoin
+from urllib.parse import unquote
 import json
 import mimetypes
 import os
@@ -92,9 +93,12 @@ class FantiaDownloader:
                 page_number += 1
 
 
-    def perform_download(self, url, filename):
+    def perform_download(self, url, filename, server_filename=False):
         request = self.session.get(url, stream=True)
         request.raise_for_status()
+        
+        if server_filename:
+            filename=os.path.join(os.path.dirname(filename), os.path.basename(unquote(request.url.split("?", 1)[0])))
 
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filename):
@@ -126,7 +130,7 @@ class FantiaDownloader:
     def download_video(self, post, post_directory):
         filename = os.path.join(post_directory, post["filename"])
         download_url = urljoin(self.POST_URL, post["download_uri"])
-        self.perform_download(download_url, filename)
+        self.perform_download(download_url, filename, server_filename=True)
 
 
     def download_post_content(self, post_json, post_directory):
