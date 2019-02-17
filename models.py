@@ -27,7 +27,6 @@ class FantiaDownloader:
     POST_URL = "https://fantia.jp/posts"
     POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
 
-
     def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, directory=None, quiet=True):
         self.email = email
         self.password = password
@@ -38,12 +37,10 @@ class FantiaDownloader:
         self.session = requests.session()
         self.login()
 
-
     def output(self, output):
         if not self.quiet:
             sys.stdout.write(output)
             sys.stdout.flush()
-
 
     def login(self):
         login = self.session.get(self.LOGIN_URL)
@@ -72,12 +69,10 @@ class FantiaDownloader:
         else:
             sys.exit("Error: Failed to login. Please verify your username and password")
 
-
     def download_fanclub_posts(self, fanclub):
         post_ids = self.fetch_fanclub_posts(fanclub)
         for post_id in post_ids:
             self.download_post(post_id)
-
 
     def fetch_fanclub_posts(self, fanclub):
         all_posts = []
@@ -92,20 +87,19 @@ class FantiaDownloader:
                 all_posts += post_ids
                 page_number += 1
 
-
     def perform_download(self, url, filename, server_filename=False):
         request = self.session.get(url, stream=True)
         request.raise_for_status()
-        
+
         if server_filename:
-            filename=os.path.join(os.path.dirname(filename), os.path.basename(unquote(request.url.split("?", 1)[0])))
+            filename = os.path.join(os.path.dirname(filename), os.path.basename(unquote(request.url.split("?", 1)[0])))
 
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filename):
-            if os.stat(filename).st_size  == file_size:
+            if os.stat(filename).st_size == file_size:
                 self.output("File found(skipping): {}\n".format(filename))
                 return
-        
+
         self.output("File: {}\n".format(filename))
 
         downloaded = 0
@@ -118,7 +112,6 @@ class FantiaDownloader:
                 self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
         self.output("\n")
 
-
     def download_photo(self, photo, photo_counter, gallery_directory):
         download_url = photo["url"]["original"]
         photo_header = self.session.head(download_url)
@@ -126,12 +119,10 @@ class FantiaDownloader:
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(download_url, filename)
 
-
     def download_video(self, post, post_directory):
         filename = os.path.join(post_directory, post["filename"])
         download_url = urljoin(self.POST_URL, post["download_uri"])
         self.perform_download(download_url, filename, server_filename=True)
-
 
     def download_post_content(self, post_json, post_directory):
         if post_json.get("category") == "photo_gallery":
@@ -145,7 +136,6 @@ class FantiaDownloader:
                 photo_counter += 1
         elif post_json.get("category") == "file":
             self.download_video(post_json, post_directory)
-
 
     def download_post(self, post_id):
         response = self.session.get(self.POST_API.format(post_id))
@@ -163,7 +153,6 @@ class FantiaDownloader:
             self.save_metadata(post_json, post_directory)
         for post in post_contents:
             self.download_post_content(post, post_directory)
-
 
     def save_metadata(self, metadata, directory):
         filename = os.path.join(directory, "metadata.json")
