@@ -4,6 +4,7 @@
 import requests
 
 from urllib.parse import urljoin
+from urllib.parse import unquote
 import json
 import mimetypes
 import os
@@ -92,11 +93,19 @@ class FantiaDownloader:
                 page_number += 1
 
 
-    def perform_download(self, url, filename):
+    def perform_download(self, url, filename, server_filename=False):
         request = self.session.get(url, stream=True)
         request.raise_for_status()
+        
+        if server_filename:
+            filename=os.path.join(os.path.dirname(filename), os.path.basename(unquote(request.url.split("?", 1)[0])))
 
         file_size = int(request.headers["Content-Length"])
+        if os.path.isfile(filename):
+            if os.stat(filename).st_size  == file_size:
+                self.output("File found(skipping): {}\n".format(filename))
+                return
+        
         self.output("File: {}\n".format(filename))
 
         downloaded = 0
@@ -121,11 +130,11 @@ class FantiaDownloader:
     def download_video(self, post, post_directory):
         filename = os.path.join(post_directory, post["filename"])
         download_url = urljoin(self.POST_URL, post["download_uri"])
-        self.perform_download(download_url, filename)
+        self.perform_download(download_url, filename, server_filename=True)
 
 
     def download_post_content(self, post_json, post_directory):
-        if post_json["category"] == "photo_gallery":
+        if post_json.get("category") == "photo_gallery":
             photo_gallery_title = post_json["title"]
             photo_gallery = post_json["post_content_photos"]
             photo_counter = 0
@@ -134,7 +143,7 @@ class FantiaDownloader:
             for photo in photo_gallery:
                 self.download_photo(photo, photo_counter, gallery_directory)
                 photo_counter += 1
-        elif post_json["category"] == "file":
+        elif post_json.get("category") == "file":
             self.download_video(post_json, post_directory)
 
 
