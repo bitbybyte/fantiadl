@@ -97,6 +97,11 @@ class FantiaDownloader:
         request.raise_for_status()
 
         file_size = int(request.headers["Content-Length"])
+        if os.path.isfile(filename):
+            if os.stat(filename).st_size  == file_size:
+                self.output("File found(skipping): {}\n".format(filename))
+                return
+        
         self.output("File: {}\n".format(filename))
 
         downloaded = 0
