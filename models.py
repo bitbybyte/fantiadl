@@ -125,7 +125,7 @@ class FantiaDownloader:
 
 
     def download_post_content(self, post_json, post_directory):
-        if post_json["category"] == "photo_gallery":
+        if post_json.get("category") == "photo_gallery":
             photo_gallery_title = post_json["title"]
             photo_gallery = post_json["post_content_photos"]
             photo_counter = 0
@@ -134,7 +134,7 @@ class FantiaDownloader:
             for photo in photo_gallery:
                 self.download_photo(photo, photo_counter, gallery_directory)
                 photo_counter += 1
-        elif post_json["category"] == "file":
+        elif post_json.get("category") == "file":
             self.download_video(post_json, post_directory)
 
 
