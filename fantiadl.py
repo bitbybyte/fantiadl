@@ -27,9 +27,10 @@ if __name__ == "__main__":
     cmdl_parser.add_argument("-n", "--netrc", action="store_true", dest="netrc", help="login with .netrc")
     cmdl_parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="suppress output")
     cmdl_parser.add_argument("-v", "--version", action="version", version=cmdl_version)
-    cmdl_parser.add_argument("url", help="fanclub or post URL")
+    cmdl_parser.add_argument("url", action="store", nargs="+", help="fanclub or post URL")
 
     dl_group = cmdl_parser.add_argument_group("download options")
+    dl_group.add_argument("-l", "--limit", dest="limit", metavar='N', type=int, default=0, help="limit the number of posts to process")
     dl_group.add_argument("-o", "--output-directory", dest="output_path", help="directory to download to")
     dl_group.add_argument("-m", "--dump-metadata", action="store_true", dest="dump_metadata", help="store metadata to file")
 
@@ -53,12 +54,13 @@ if __name__ == "__main__":
 
     downloader = FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet)
 
-    url_groups = downloader.FANTIA_URL_RE.match(cmdl_opts.url).groups()
-    if url_groups:
-        if url_groups[0] == "fanclubs":
-            fanclub = FantiaClub(url_groups[1])
-            downloader.download_fanclub_posts(fanclub)
-        elif url_groups[0] == "posts":
-            downloader.download_post(url_groups[1])
-    else:
-        sys.exit("Please provide a valid Fantia URL (/posts/[id], /fanclubs/[id])")
+    for url in cmdl_opts.url:
+        url_groups = downloader.FANTIA_URL_RE.match(url).groups()
+        if url_groups:
+            if url_groups[0] == "fanclubs":
+                fanclub = FantiaClub(url_groups[1])
+                downloader.download_fanclub_posts(fanclub, cmdl_opts.limit)
+            elif url_groups[0] == "posts":
+                downloader.download_post(url_groups[1])
+        else:
+            sys.stderr("{} is not a valid URL. Please provide a valid Fantia URL (/posts/[id], /fanclubs/[id])" % url)

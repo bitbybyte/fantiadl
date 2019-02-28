@@ -69,9 +69,9 @@ class FantiaDownloader:
         else:
             sys.exit("Error: Failed to login. Please verify your username and password")
 
-    def download_fanclub_posts(self, fanclub):
+    def download_fanclub_posts(self, fanclub, limit=0):
         post_ids = self.fetch_fanclub_posts(fanclub)
-        for post_id in post_ids:
+        for post_id in post_ids if limit == 0 else post_ids[:limit]:
             self.download_post(post_id)
 
     def fetch_fanclub_posts(self, fanclub):
