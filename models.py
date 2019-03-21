@@ -127,6 +127,8 @@ class FantiaDownloader:
     def download_post_content(self, post_json, post_directory):
         if post_json.get("category") == "photo_gallery":
             photo_gallery_title = post_json["title"]
+            if not photo_gallery_title:
+                photo_gallery_title = str(post_json["id"])
             photo_gallery = post_json["post_content_photos"]
             photo_counter = 0
             gallery_directory = os.path.join(post_directory, sanitize_for_path(photo_gallery_title))
