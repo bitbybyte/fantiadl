@@ -14,6 +14,7 @@ import sys
 
 class FantiaDownloader:
     FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
+    EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com)\/))[^\s]+)")
 
     LOGIN_URL = "https://fantia.jp/auth/login"
     LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}"
@@ -27,11 +28,13 @@ class FantiaDownloader:
     POST_URL = "https://fantia.jp/posts"
     POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
 
-    def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, directory=None, quiet=True):
+    def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True):
         self.email = email
         self.password = password
         self.chunk_size = chunk_size
         self.dump_metadata = dump_metadata
+        self.parse_for_external_links = parse_for_external_links
+        self.download_thumb = download_thumb
         self.directory = directory or ""
         self.quiet = quiet
         self.session = requests.session()
@@ -139,6 +142,12 @@ class FantiaDownloader:
         elif post_json.get("category") == "file":
             self.download_video(post_json, post_directory)
 
+    def download_thumbnail(self, thumb_url, post_directory):
+        thumb_header = self.session.head(thumb_url)
+        extension = mimetypes.guess_extension(thumb_header.headers["Content-Type"], strict=True)
+        filename = os.path.join(post_directory, "thumb" + extension)
+        self.perform_download(thumb_url, filename)
+
     def download_post(self, post_id):
         response = self.session.get(self.POST_API.format(post_id))
         response.raise_for_status()
@@ -148,12 +157,23 @@ class FantiaDownloader:
         self.output("Downloading post {}...\n".format(post_id))
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
+        post_description = post_json["comment"]
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), sanitize_for_path(str(post_id) + " - " + post_title))
+
         os.makedirs(post_directory, exist_ok=True)
         if self.dump_metadata:
             save_metadata(post_json, post_directory)
+        if self.download_thumb and post_json["thumb"]:
+            self.download_thumbnail(post_json["thumb"]["original"], post_directory)
+        if self.parse_for_external_links:
+            self.parse_external_links(post_description, os.path.abspath(post_directory))
         for post in post_contents:
             self.download_post_content(post, post_directory)
+
+    def parse_external_links(self, post_description, post_directory):
+        link_matches = self.EXTERNAL_LINKS_RE.findall(post_description)
+        if link_matches:
+            build_crawljob(link_matches, self.directory, post_directory)
 
 
 class FantiaClub:
@@ -171,3 +191,24 @@ def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
     sanitized = re.sub(r'[<>\"\?\\\/\*:|]', replace, value)
     return re.sub(r'[\s.]+$', '', sanitized)
+
+
+def build_crawljob(links, root_directory, post_directory):
+    filename = os.path.join(root_directory, "external_links.crawljob")
+    with open(filename, "a", encoding="utf-8") as file:
+        for link in links:
+            crawl_dict = {
+                    "packageName" : "Fantia",
+                    "text" : link,
+                    "downloadFolder" : post_directory,
+                    "enabled" : "true",
+                    "autoStart" : "true",
+                    "forcedStart" : "true",
+                    "autoConfirm" : "true",
+                    "addOfflineLink" : "true",
+                    "extractAfterDownload" : "false"
+                }
+
+            for key, value in crawl_dict.items():
+                file.write(key + "=" + value + "\n")
+            file.write("\n")

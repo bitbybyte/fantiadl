@@ -1,5 +1,5 @@
 # FantiaDL
-Download media and other data from Fantia fanclubs and posts. An email and password must be provided using the -e and -p arguments.
+Download media and other data from Fantia fanclubs and posts. An email and password must be provided using the -e and -p arguments or with a .netrc file.
 
 ```
 usage: fantiadl.py [options] url
@@ -18,10 +18,18 @@ optional arguments:
   -v, --version         show program's version number and exit
 
 download options:
+  -l N, --limit N       limit the number of posts to process
   -o OUTPUT_PATH, --output-directory OUTPUT_PATH
-                        directory to download to
+                        root directory to download to
   -m, --dump-metadata   store metadata to file
+  -x, --parse-for-external-links
+                        parse post descriptions for external links
+  -t, --download-thumbnail
+                        download post thumbnail
 ```
+
+When parsing for external links using `-x`, a `.crawljob` file is created in your root directory (either the directory provided with `-o` or the directory the script is being run from) that can be parsed by [JDownloader](http://jdownloader.org/). As posts are parsed, links will be appended and assigned their appropriate post directories for download. You can import this file manually into JDownloader (File -> Load Linkcontainer) or setup the Folder Watch plugin to watch your root directory for `.crawljob` files.
+
 ## Download
 Check the [releases page](https://github.com/bitbybyte/fantiadl/releases/latest) for the latest binaries.
 
@@ -30,5 +38,4 @@ Check the [releases page](https://github.com/bitbybyte/fantiadl/releases/latest)
  - requests
 
 ## Roadmap
- - Custom filename templating
  - More robust logging
