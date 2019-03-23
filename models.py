@@ -97,7 +97,7 @@ class FantiaDownloader:
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filename):
             if os.stat(filename).st_size == file_size:
-                self.output("File found(skipping): {}\n".format(filename))
+                self.output("File found (skipping): {}\n".format(filename))
                 return
 
         self.output("File: {}\n".format(filename))
@@ -148,18 +148,12 @@ class FantiaDownloader:
         self.output("Downloading post {}...\n".format(post_id))
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
-        # TODO: Assign base directory to class
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), sanitize_for_path(str(post_id) + " - " + post_title))
         os.makedirs(post_directory, exist_ok=True)
         if self.dump_metadata:
-            self.save_metadata(post_json, post_directory)
+            save_metadata(post_json, post_directory)
         for post in post_contents:
             self.download_post_content(post, post_directory)
-
-    def save_metadata(self, metadata, directory):
-        filename = os.path.join(directory, "metadata.json")
-        with open(filename, "w") as file:
-            json.dump(metadata, file, sort_keys=True, indent=4)
 
 
 class FantiaClub:
@@ -167,6 +161,12 @@ class FantiaClub:
         self.id = fanclub_id
 
 
+def save_metadata(metadata, directory):
+    filename = os.path.join(directory, "metadata.json")
+    with open(filename, "w") as file:
+        json.dump(metadata, file, sort_keys=True, indent=4)
+
+
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
-    return re.sub(r'[<>\"\?\\\/\*:]', replace, value)
+    return re.sub(r'[<>\"\?\\\/\*:|]', replace, value).rstrip()
