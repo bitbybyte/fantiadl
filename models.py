@@ -169,4 +169,5 @@ def save_metadata(metadata, directory):
 
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
-    return re.sub(r'[<>\"\?\\\/\*:|]', replace, value).rstrip()
+    sanitized = re.sub(r'[<>\"\?\\\/\*:|]', replace, value)
+    return re.sub(r'[\s.]+$', '', sanitized)
