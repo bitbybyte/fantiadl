@@ -6,6 +6,7 @@ import argparse
 import getpass
 import netrc
 import sys
+import traceback
 
 from models import FantiaDownloader, FantiaClub
 
@@ -61,12 +62,20 @@ if __name__ == "__main__":
         for url in cmdl_opts.url:
                 url_match = downloader.FANTIA_URL_RE.match(url)
                 if url_match:
-                    url_groups = url_match.groups()
-                    if url_groups[0] == "fanclubs":
-                        fanclub = FantiaClub(url_groups[1])
-                        downloader.download_fanclub_posts(fanclub, cmdl_opts.limit)
-                    elif url_groups[0] == "posts":
-                        downloader.download_post(url_groups[1])
+                    try:
+                        url_groups = url_match.groups()
+                        if url_groups[0] == "fanclubs":
+                            fanclub = FantiaClub(url_groups[1])
+                            downloader.download_fanclub_posts(fanclub, cmdl_opts.limit)
+                        elif url_groups[0] == "posts":
+                            downloader.download_post(url_groups[1])
+                    except:
+                        if cmdl_opts.continue_on_error:
+                            downloader.output("Encountered an error downloading URL. Skipping...\n")
+                            traceback.print_exc()
+                            continue
+                        else:
+                            raise
                 else:
                     sys.stderr.write("{} is not a valid URL. Please provide a fully qualified Fantia URL (https://fantia.jp/posts/[id], https://fantia.jp/fanclubs/[id])".format(url))
     except KeyboardInterrupt:
