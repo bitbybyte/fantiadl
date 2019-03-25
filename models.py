@@ -10,6 +10,7 @@ import mimetypes
 import os
 import re
 import sys
+import traceback
 
 
 class FantiaDownloader:
@@ -28,7 +29,7 @@ class FantiaDownloader:
     POST_URL = "https://fantia.jp/posts"
     POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
 
-    def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True):
+    def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False):
         self.email = email
         self.password = password
         self.chunk_size = chunk_size
@@ -37,6 +38,7 @@ class FantiaDownloader:
         self.download_thumb = download_thumb
         self.directory = directory or ""
         self.quiet = quiet
+        self.continue_on_error = continue_on_error
         self.session = requests.session()
         self.login()
 
@@ -75,7 +77,17 @@ class FantiaDownloader:
     def download_fanclub_posts(self, fanclub, limit=0):
         post_ids = self.fetch_fanclub_posts(fanclub)
         for post_id in post_ids if limit == 0 else post_ids[:limit]:
-            self.download_post(post_id)
+            try:
+                self.download_post(post_id)
+            except KeyboardInterrupt:
+                raise
+            except:
+                if self.continue_on_error:
+                    self.output("Encountered an error downloading post. Skipping...\n")
+                    traceback.print_exc()
+                    continue
+                else:
+                    raise
 
     def fetch_fanclub_posts(self, fanclub):
         all_posts = []
@@ -173,7 +185,7 @@ class FantiaDownloader:
     def parse_external_links(self, post_description, post_directory):
         link_matches = self.EXTERNAL_LINKS_RE.findall(post_description)
         if link_matches:
-            self.output("Found {} external link(s) in post. Saving...".format(len(link_matches)))
+            self.output("Found {} external link(s) in post. Saving...\n".format(len(link_matches)))
             build_crawljob(link_matches, self.directory, post_directory)
 
 
