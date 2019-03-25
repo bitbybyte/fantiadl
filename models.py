@@ -157,7 +157,7 @@ class FantiaDownloader:
         self.output("Downloading post {}...\n".format(post_id))
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
-        post_description = post_json["comment"]
+        post_description = post_json["comment"] or ""
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), sanitize_for_path(str(post_id) + " - " + post_title))
 
         os.makedirs(post_directory, exist_ok=True)
@@ -173,6 +173,7 @@ class FantiaDownloader:
     def parse_external_links(self, post_description, post_directory):
         link_matches = self.EXTERNAL_LINKS_RE.findall(post_description)
         if link_matches:
+            self.output("Found {} external link(s) in post. Saving...".format(len(link_matches)))
             build_crawljob(link_matches, self.directory, post_directory)
 
 
