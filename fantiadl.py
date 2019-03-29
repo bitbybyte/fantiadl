@@ -36,6 +36,7 @@ if __name__ == "__main__":
     dl_group.add_argument("-o", "--output-directory", dest="output_path", help="directory to download to")
     dl_group.add_argument("-m", "--dump-metadata", action="store_true", dest="dump_metadata", help="store metadata to file")
     dl_group.add_argument("-x", "--parse-for-external-links", action="store_true", dest="parse_for_external_links", help="parse post descriptions for external links")
+    dl_group.add_argument("-a", "--autostart-crawljob", action="store_true", dest="autostart_crawljob", help="sets crawljob autoStart to true")
     dl_group.add_argument("-t", "--download-thumbnail", action="store_true", dest="download_thumb", help="download post thumbnail")
 
     cmdl_opts = cmdl_parser.parse_args()
@@ -57,7 +58,7 @@ if __name__ == "__main__":
             password = getpass.getpass("Password: ")
 
     try:
-        downloader = FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error)
+        downloader = FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error)
 
         for url in cmdl_opts.url:
                 url_match = downloader.FANTIA_URL_RE.match(url)
