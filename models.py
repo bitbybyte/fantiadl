@@ -182,6 +182,9 @@ class FantiaDownloader:
             self.parse_external_links(post_description, os.path.abspath(post_directory))
         for post in post_contents:
             self.download_post_content(post, post_directory)
+        if not os.listdir(post_directory):
+            self.output("No content downloaded for post {}. Deleting directory...\n".format(post_id))
+            os.rmdir(post_directory)
 
     def parse_external_links(self, post_description, post_directory):
         link_matches = self.EXTERNAL_LINKS_RE.findall(post_description)
