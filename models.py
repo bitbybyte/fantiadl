@@ -29,12 +29,13 @@ class FantiaDownloader:
     POST_URL = "https://fantia.jp/posts"
     POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
 
-    def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False):
+    def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False):
         self.email = email
         self.password = password
         self.chunk_size = chunk_size
         self.dump_metadata = dump_metadata
         self.parse_for_external_links = parse_for_external_links
+        self.autostart_crawljob = autostart_crawljob
         self.download_thumb = download_thumb
         self.directory = directory or ""
         self.quiet = quiet
@@ -186,7 +187,7 @@ class FantiaDownloader:
         link_matches = self.EXTERNAL_LINKS_RE.findall(post_description)
         if link_matches:
             self.output("Found {} external link(s) in post. Saving...\n".format(len(link_matches)))
-            build_crawljob(link_matches, self.directory, post_directory)
+            build_crawljob(link_matches, self.directory, post_directory, self.autostart_crawljob)
 
 
 class FantiaClub:
@@ -206,7 +207,7 @@ def sanitize_for_path(value, replace=' '):
     return re.sub(r'[\s.]+$', '', sanitized)
 
 
-def build_crawljob(links, root_directory, post_directory):
+def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
     filename = os.path.join(root_directory, "external_links.crawljob")
     with open(filename, "a", encoding="utf-8") as file:
         for link in links:
@@ -215,7 +216,7 @@ def build_crawljob(links, root_directory, post_directory):
                     "text" : link,
                     "downloadFolder" : post_directory,
                     "enabled" : "true",
-                    "autoStart" : "true",
+                    "autoStart" : str(autostart_crawljob).lower(),
                     "forcedStart" : "true",
                     "autoConfirm" : "true",
                     "addOfflineLink" : "true",
