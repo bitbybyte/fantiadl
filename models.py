@@ -29,6 +29,14 @@ class FantiaDownloader:
     POST_URL = "https://fantia.jp/posts"
     POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
 
+    MIMETYPES = {
+        "image/jpeg" : ".jpg",
+        "image/png" : ".png",
+        "image/gif" : ".gif",
+        "video/mp4" : ".mp4",
+        "video/webm" : ".webm"
+    }
+
     def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False):
         self.email = email
         self.password = password
@@ -131,7 +139,8 @@ class FantiaDownloader:
     def download_photo(self, photo, photo_counter, gallery_directory):
         download_url = photo["url"]["original"]
         photo_header = self.session.head(download_url)
-        extension = mimetypes.guess_extension(photo_header.headers["Content-Type"], strict=True)
+        mimetype = photo_header.headers["Content-Type"]
+        extension = self.MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(download_url, filename)
 
