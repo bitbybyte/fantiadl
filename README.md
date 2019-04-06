@@ -15,16 +15,18 @@ optional arguments:
                         fantia password
   -n, --netrc           login with .netrc
   -q, --quiet           suppress output
-  -i, --ignore-errors   continue on download errors
   -v, --version         show program's version number and exit
 
 download options:
+  -i, --ignore-errors   continue on download errors
   -l N, --limit N       limit the number of posts to process
   -o OUTPUT_PATH, --output-directory OUTPUT_PATH
                         directory to download to
   -m, --dump-metadata   store metadata to file
   -x, --parse-for-external-links
                         parse post descriptions for external links
+  -a, --autostart-crawljob
+                        make links autostart when added to JDownloader
   -t, --download-thumbnail
                         download post thumbnail
 ```
