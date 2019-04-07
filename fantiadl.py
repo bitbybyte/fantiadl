@@ -8,7 +8,7 @@ import netrc
 import sys
 import traceback
 
-from models import FantiaDownloader, FantiaClub
+import models
 
 __author__ = "bitbybyte"
 __copyright__ = "Copyright 2019 bitbybyte"
@@ -58,15 +58,15 @@ if __name__ == "__main__":
             password = getpass.getpass("Password: ")
 
     try:
-        downloader = FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error)
+        downloader = models.FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error)
 
         for url in cmdl_opts.url:
-                url_match = downloader.FANTIA_URL_RE.match(url)
+                url_match = models.FANTIA_URL_RE.match(url)
                 if url_match:
                     try:
                         url_groups = url_match.groups()
                         if url_groups[0] == "fanclubs":
-                            fanclub = FantiaClub(url_groups[1])
+                            fanclub = models.FantiaClub(url_groups[1])
                             downloader.download_fanclub_posts(fanclub, cmdl_opts.limit)
                         elif url_groups[0] == "posts":
                             downloader.download_post(url_groups[1])

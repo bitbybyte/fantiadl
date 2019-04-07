@@ -13,31 +13,32 @@ import sys
 import traceback
 
 
+FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
+EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com)\/))[^\s]+)")
+
+LOGIN_URL = "https://fantia.jp/auth/login"
+LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}"
+
+ME_API = "https://fantia.jp/api/v1/me"
+
+FANCLUB_API = "https://fantia.jp/api/v1/fanclubs/{}"
+FANCLUB_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
+
+POST_API = "https://fantia.jp/api/v1/posts/{}"
+POST_URL = "https://fantia.jp/posts"
+POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
+
+MIMETYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "video/mp4": ".mp4",
+    "video/webm": ".webm"
+}
+
+
 class FantiaDownloader:
-    FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
-    EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com)\/))[^\s]+)")
-
-    LOGIN_URL = "https://fantia.jp/auth/login"
-    LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}"
-
-    ME_API = "https://fantia.jp/api/v1/me"
-
-    FANCLUB_API = "https://fantia.jp/api/v1/fanclubs/{}"
-    FANCLUB_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
-
-    POST_API = "https://fantia.jp/api/v1/posts/{}"
-    POST_URL = "https://fantia.jp/posts"
-    POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
-
-    MIMETYPES = {
-        "image/jpeg" : ".jpg",
-        "image/png" : ".png",
-        "image/gif" : ".gif",
-        "video/mp4" : ".mp4",
-        "video/webm" : ".webm"
-    }
-
-    def __init__(self, email, password, chunk_size=1024*1024*5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False):
+    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False):
         self.email = email
         self.password = password
         self.chunk_size = chunk_size
@@ -57,7 +58,7 @@ class FantiaDownloader:
             sys.stdout.flush()
 
     def login(self):
-        login = self.session.get(self.LOGIN_URL)
+        login = self.session.get(LOGIN_URL)
         auth_url = login.url.replace("id.fantia.jp/auth/", "id.fantia.jp/authorize")
 
         login_json = {
@@ -73,11 +74,11 @@ class FantiaDownloader:
         if auth_response["status"] == "OK":
             auth_payload = auth_response["payload"]
 
-            callback = self.session.get(self.LOGIN_CALLBACK_URL.format(auth_payload["code"], auth_payload["state"]))
+            callback = self.session.get(LOGIN_CALLBACK_URL.format(auth_payload["code"], auth_payload["state"]))
             if not callback.cookies["_session_id"]:
                 sys.exit("Error: Failed to retrieve session key from callback")
 
-            check_user = self.session.get(self.ME_API)
+            check_user = self.session.get(ME_API)
             if not check_user.status_code == 200:
                 sys.exit("Error: Invalid session")
         else:
@@ -102,9 +103,9 @@ class FantiaDownloader:
         all_posts = []
         page_number = 1
         while True:
-            response = self.session.get(self.FANCLUB_HTML.format(fanclub.id, page_number))
+            response = self.session.get(FANCLUB_HTML.format(fanclub.id, page_number))
             response.raise_for_status()
-            post_ids = re.findall(self.POST_URL_RE, response.text)
+            post_ids = re.findall(POST_URL_RE, response.text)
             if not post_ids:
                 return all_posts
             else:
@@ -140,13 +141,13 @@ class FantiaDownloader:
         download_url = photo["url"]["original"]
         photo_header = self.session.head(download_url)
         mimetype = photo_header.headers["Content-Type"]
-        extension = self.MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
+        extension = guess_extension(mimetype)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(download_url, filename)
 
     def download_video(self, post, post_directory):
         filename = os.path.join(post_directory, post["filename"])
-        download_url = urljoin(self.POST_URL, post["download_uri"])
+        download_url = urljoin(POST_URL, post["download_uri"])
         self.perform_download(download_url, filename, server_filename=True)
 
     def download_post_content(self, post_json, post_directory):
@@ -166,12 +167,13 @@ class FantiaDownloader:
 
     def download_thumbnail(self, thumb_url, post_directory):
         thumb_header = self.session.head(thumb_url)
-        extension = mimetypes.guess_extension(thumb_header.headers["Content-Type"], strict=True)
+        mimetype = thumb_header.headers["Content-Type"]
+        extension = guess_extension(mimetype)
         filename = os.path.join(post_directory, "thumb" + extension)
         self.perform_download(thumb_url, filename)
 
     def download_post(self, post_id):
-        response = self.session.get(self.POST_API.format(post_id))
+        response = self.session.get(POST_API.format(post_id))
         response.raise_for_status()
         post_json = json.loads(response.text)["post"]
         post_id = post_json["id"]
@@ -196,7 +198,7 @@ class FantiaDownloader:
             os.rmdir(post_directory)
 
     def parse_external_links(self, post_description, post_directory):
-        link_matches = self.EXTERNAL_LINKS_RE.findall(post_description)
+        link_matches = EXTERNAL_LINKS_RE.findall(post_description)
         if link_matches:
             self.output("Found {} external link(s) in post. Saving...\n".format(len(link_matches)))
             build_crawljob(link_matches, self.directory, post_directory, self.autostart_crawljob)
@@ -205,6 +207,10 @@ class FantiaDownloader:
 class FantiaClub:
     def __init__(self, fanclub_id):
         self.id = fanclub_id
+
+
+def guess_extension(mimetype):
+    return MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
 
 
 def save_metadata(metadata, directory):
@@ -224,16 +230,16 @@ def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
     with open(filename, "a", encoding="utf-8") as file:
         for link in links:
             crawl_dict = {
-                    "packageName" : "Fantia",
-                    "text" : link,
-                    "downloadFolder" : post_directory,
-                    "enabled" : "true",
-                    "autoStart" : str(autostart_crawljob).lower(),
-                    "forcedStart" : "true",
-                    "autoConfirm" : "true",
-                    "addOfflineLink" : "true",
-                    "extractAfterDownload" : "false"
-                }
+                "packageName": "Fantia",
+                "text": link,
+                "downloadFolder": post_directory,
+                "enabled": "true",
+                "autoStart": str(autostart_crawljob).lower(),
+                "forcedStart": "true",
+                "autoConfirm": "true",
+                "addOfflineLink": "true",
+                "extractAfterDownload": "false"
+            }
 
             for key, value in crawl_dict.items():
                 file.write(key + "=" + value + "\n")
