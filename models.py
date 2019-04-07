@@ -53,11 +53,13 @@ class FantiaDownloader:
         self.login()
 
     def output(self, output):
+        """Write output to the console."""
         if not self.quiet:
             sys.stdout.write(output)
             sys.stdout.flush()
 
     def login(self):
+        """Login to Fantia using the provided email and password."""
         login = self.session.get(LOGIN_URL)
         auth_url = login.url.replace("id.fantia.jp/auth/", "id.fantia.jp/authorize")
 
@@ -85,6 +87,7 @@ class FantiaDownloader:
             sys.exit("Error: Failed to login. Please verify your username and password")
 
     def download_fanclub_posts(self, fanclub, limit=0):
+        """Download each post from a fanclub."""
         post_ids = self.fetch_fanclub_posts(fanclub)
         for post_id in post_ids if limit == 0 else post_ids[:limit]:
             try:
@@ -100,6 +103,7 @@ class FantiaDownloader:
                     raise
 
     def fetch_fanclub_posts(self, fanclub):
+        """Iterate over a fanclub's HTML pages to fetch all post IDs."""
         all_posts = []
         page_number = 1
         while True:
@@ -113,6 +117,7 @@ class FantiaDownloader:
                 page_number += 1
 
     def perform_download(self, url, filename, server_filename=False):
+        """Perform a download for the specified URL while showing progress."""
         request = self.session.get(url, stream=True)
         request.raise_for_status()
 
@@ -138,6 +143,7 @@ class FantiaDownloader:
         self.output("\n")
 
     def download_photo(self, photo, photo_counter, gallery_directory):
+        """Download a photo to the post's directory."""
         download_url = photo["url"]["original"]
         photo_header = self.session.head(download_url)
         mimetype = photo_header.headers["Content-Type"]
@@ -146,11 +152,13 @@ class FantiaDownloader:
         self.perform_download(download_url, filename)
 
     def download_video(self, post, post_directory):
+        """Download a video to the post's directory."""
         filename = os.path.join(post_directory, post["filename"])
         download_url = urljoin(POST_URL, post["download_uri"])
         self.perform_download(download_url, filename, server_filename=True)
 
     def download_post_content(self, post_json, post_directory):
+        """Parse the post's content to determine whether to save the content as a photo gallery or file."""
         if post_json.get("category") == "photo_gallery":
             photo_gallery_title = post_json["title"]
             if not photo_gallery_title:
@@ -166,6 +174,7 @@ class FantiaDownloader:
             self.download_video(post_json, post_directory)
 
     def download_thumbnail(self, thumb_url, post_directory):
+        """Download a thumbnail to the post's directory."""
         thumb_header = self.session.head(thumb_url)
         mimetype = thumb_header.headers["Content-Type"]
         extension = guess_extension(mimetype)
@@ -173,6 +182,7 @@ class FantiaDownloader:
         self.perform_download(thumb_url, filename)
 
     def download_post(self, post_id):
+        """Download a post to its own directory."""
         response = self.session.get(POST_API.format(post_id))
         response.raise_for_status()
         post_json = json.loads(response.text)["post"]
@@ -198,6 +208,7 @@ class FantiaDownloader:
             os.rmdir(post_directory)
 
     def parse_external_links(self, post_description, post_directory):
+        """Parse the post description for external links, e.g. Mega and Google Drive links."""
         link_matches = EXTERNAL_LINKS_RE.findall(post_description)
         if link_matches:
             self.output("Found {} external link(s) in post. Saving...\n".format(len(link_matches)))
@@ -210,10 +221,12 @@ class FantiaClub:
 
 
 def guess_extension(mimetype):
+    """Guess the file extension from the mimetype or force a specific extension for certain mimetypes."""
     return MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
 
 
 def save_metadata(metadata, directory):
+    """Save the metadata for a post to the post's directory."""
     filename = os.path.join(directory, "metadata.json")
     with open(filename, "w") as file:
         json.dump(metadata, file, sort_keys=True, indent=4)
@@ -226,6 +239,7 @@ def sanitize_for_path(value, replace=' '):
 
 
 def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
+    """Append to a root .crawljob file with external links gathered from a post."""
     filename = os.path.join(root_directory, "external_links.crawljob")
     with open(filename, "a", encoding="utf-8") as file:
         for link in links:
