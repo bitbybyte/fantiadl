@@ -22,6 +22,7 @@ LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}
 ME_API = "https://fantia.jp/api/v1/me"
 
 FANCLUB_API = "https://fantia.jp/api/v1/fanclubs/{}"
+FANCLUBS_FOLLOWING_API = "https://fantia.jp/api/v1/me/fanclubs"
 FANCLUB_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
 
 POST_API = "https://fantia.jp/api/v1/posts/{}"
@@ -88,6 +89,7 @@ class FantiaDownloader:
 
     def download_fanclub_posts(self, fanclub, limit=0):
         """Download each post from a fanclub."""
+        self.output("Downloading fanclub {}...\n".format(fanclub.id))
         post_ids = self.fetch_fanclub_posts(fanclub)
         for post_id in post_ids if limit == 0 else post_ids[:limit]:
             try:
@@ -97,6 +99,26 @@ class FantiaDownloader:
             except:
                 if self.continue_on_error:
                     self.output("Encountered an error downloading post. Skipping...\n")
+                    traceback.print_exc()
+                    continue
+                else:
+                    raise
+
+    def download_followed_fanclubs(self, limit=0):
+        """Download posts from all followed fanclubs."""
+        response = self.session.get(FANCLUBS_FOLLOWING_API)
+        response.raise_for_status()
+        fanclub_ids = json.loads(response.text)["fanclub_ids"]
+
+        for fanclub in fanclub_ids:
+            try:
+                club = FantiaClub(fanclub)
+                self.download_fanclub_posts(club, limit)
+            except KeyboardInterrupt:
+                raise
+            except:
+                if self.continue_on_error:
+                    self.output("Encountered an error downloading fanclub. Skipping...\n")
                     traceback.print_exc()
                     continue
                 else:
@@ -204,7 +226,7 @@ class FantiaDownloader:
         for post in post_contents:
             self.download_post_content(post, post_directory)
         if not os.listdir(post_directory):
-            self.output("No content downloaded for post {}. Deleting directory...\n".format(post_id))
+            self.output("No content downloaded for post {}. Deleting directory.\n".format(post_id))
             os.rmdir(post_directory)
 
     def parse_external_links(self, post_description, post_directory):
@@ -249,8 +271,8 @@ def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
                 "downloadFolder": post_directory,
                 "enabled": "true",
                 "autoStart": str(autostart_crawljob).lower(),
-                "forcedStart": "true",
-                "autoConfirm": "true",
+                "forcedStart": str(autostart_crawljob).lower(),
+                "autoConfirm": str(autostart_crawljob).lower(),
                 "addOfflineLink": "true",
                 "extractAfterDownload": "false"
             }
