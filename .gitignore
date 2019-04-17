@@ -116,3 +116,6 @@ ENV/
 
 # Crawljobs
 *.crawljob
+
+# Jetbrains
+.idea/
