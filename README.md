@@ -29,6 +29,8 @@ download options:
                         make links autostart when added to JDownloader
   -t, --download-thumbnail
                         download post thumbnail
+  -f, --download-fanclubs
+                        download posts from all followed fanclubs
 ```
 
 When parsing for external links using `-x`, a .crawljob file is created in your root directory (either the directory provided with `-o` or the directory the script is being run from) that can be parsed by [JDownloader](http://jdownloader.org/). As posts are parsed, links will be appended and assigned their appropriate post directories for download. You can import this file manually into JDownloader (File -> Load Linkcontainer) or setup the Folder Watch plugin to watch your root directory for .crawljob files.
