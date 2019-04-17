@@ -249,8 +249,8 @@ def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
                 "downloadFolder": post_directory,
                 "enabled": "true",
                 "autoStart": str(autostart_crawljob).lower(),
-                "forcedStart": "true",
-                "autoConfirm": "true",
+                "forcedStart": str(autostart_crawljob).lower(),
+                "autoConfirm": str(autostart_crawljob).lower(),
                 "addOfflineLink": "true",
                 "extractAfterDownload": "false"
             }
