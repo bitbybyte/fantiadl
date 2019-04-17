@@ -22,6 +22,7 @@ LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}
 ME_API = "https://fantia.jp/api/v1/me"
 
 FANCLUB_API = "https://fantia.jp/api/v1/fanclubs/{}"
+FANCLUB_SUBS = "https://fantia.jp/api/v1/me/fanclubs"
 FANCLUB_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
 
 POST_API = "https://fantia.jp/api/v1/posts/{}"
@@ -101,6 +102,27 @@ class FantiaDownloader:
                     continue
                 else:
                     raise
+
+    def download_fanclub_sub_posts(self, limit=0):
+        """Download each post from subscribed fanclubs."""
+        response = self.session.get(FANCLUB_SUBS)
+        response.raise_for_status()
+        fanclub_ids = json.loads(response.text)["fanclub_ids"]
+
+        for fanclub in fanclub_ids:
+            post_ids = self.fetch_fanclub_posts(FantiaClub(fanclub))
+            for post_id in post_ids if limit == 0 else post_ids[:limit]:
+                try:
+                    self.download_post(post_id)
+                except KeyboardInterrupt:
+                    raise
+                except:
+                    if self.continue_on_error:
+                        self.output("Encountered an error downloading post. Skipping...\n")
+                        traceback.print_exc()
+                        continue
+                    else:
+                        raise
 
     def fetch_fanclub_posts(self, fanclub):
         """Iterate over a fanclub's HTML pages to fetch all post IDs."""
