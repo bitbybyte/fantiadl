@@ -22,6 +22,8 @@ download options:
   -l N, --limit N       limit the number of posts to process
   -o OUTPUT_PATH, --output-directory OUTPUT_PATH
                         directory to download to
+  -s, --use-server-filenames
+                        download using server defined filenames
   -m, --dump-metadata   store metadata to file
   -x, --parse-for-external-links
                         parse post descriptions for external links

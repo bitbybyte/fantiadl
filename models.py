@@ -39,7 +39,7 @@ MIMETYPES = {
 
 
 class FantiaDownloader:
-    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False):
+    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False):
         self.email = email
         self.password = password
         self.chunk_size = chunk_size
@@ -50,6 +50,7 @@ class FantiaDownloader:
         self.directory = directory or ""
         self.quiet = quiet
         self.continue_on_error = continue_on_error
+        self.use_server_filenames = use_server_filenames
         self.session = requests.session()
         self.login()
 
@@ -171,13 +172,13 @@ class FantiaDownloader:
         mimetype = photo_header.headers["Content-Type"]
         extension = guess_extension(mimetype)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
-        self.perform_download(download_url, filename)
+        self.perform_download(download_url, filename, server_filename=self.use_server_filenames)
 
     def download_video(self, post, post_directory):
         """Download a video to the post's directory."""
         filename = os.path.join(post_directory, post["filename"])
         download_url = urljoin(POST_URL, post["download_uri"])
-        self.perform_download(download_url, filename, server_filename=True)
+        self.perform_download(download_url, filename, server_filename=self.use_server_filenames)
 
     def download_post_content(self, post_json, post_directory):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
@@ -201,7 +202,7 @@ class FantiaDownloader:
         mimetype = thumb_header.headers["Content-Type"]
         extension = guess_extension(mimetype)
         filename = os.path.join(post_directory, "thumb" + extension)
-        self.perform_download(thumb_url, filename)
+        self.perform_download(thumb_url, filename, server_filename=self.use_server_filenames)
 
     def download_post(self, post_id):
         """Download a post to its own directory."""

@@ -34,6 +34,7 @@ if __name__ == "__main__":
     dl_group.add_argument("-i", "--ignore-errors", action="store_true", dest="continue_on_error", help="continue on download errors")
     dl_group.add_argument("-l", "--limit", dest="limit", metavar='N', type=int, default=0, help="limit the number of posts to process")
     dl_group.add_argument("-o", "--output-directory", dest="output_path", help="directory to download to")
+    dl_group.add_argument("-s", "--use-server-filenames", action="store_true", dest="use_server_filenames", help="download using server defined filenames")
     dl_group.add_argument("-m", "--dump-metadata", action="store_true", dest="dump_metadata", help="store metadata to file")
     dl_group.add_argument("-x", "--parse-for-external-links", action="store_true", dest="parse_for_external_links", help="parse post descriptions for external links")
     dl_group.add_argument("-a", "--autostart-crawljob", action="store_true", dest="autostart_crawljob", help="make links autostart when added to JDownloader")
@@ -62,7 +63,7 @@ if __name__ == "__main__":
             password = getpass.getpass("Password: ")
 
     try:
-        downloader = models.FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error)
+        downloader = models.FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames)
         if cmdl_opts.download_fanclubs:
             try:
                 downloader.download_followed_fanclubs(limit=cmdl_opts.limit)
