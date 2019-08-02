@@ -24,6 +24,9 @@ download options:
                         directory to download to
   -s, --use-server-filenames
                         download using server defined filenames
+  -r, --prefix-incomplete-posts
+                        append a prefix to post directories that are
+                        incomplete
   -m, --dump-metadata   store metadata to file
   -x, --parse-for-external-links
                         parse post descriptions for external links

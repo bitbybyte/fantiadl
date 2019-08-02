@@ -16,6 +16,8 @@ import traceback
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
 EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com)\/))[^\s]+)")
 
+INCOMPLETE_PREFIX = "[INCOMPLETE] "
+
 LOGIN_URL = "https://fantia.jp/auth/login"
 LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}"
 
@@ -39,7 +41,7 @@ MIMETYPES = {
 
 
 class FantiaDownloader:
-    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False):
+    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, prefix_incomplete_posts=False):
         self.email = email
         self.password = password
         self.chunk_size = chunk_size
@@ -51,6 +53,7 @@ class FantiaDownloader:
         self.quiet = quiet
         self.continue_on_error = continue_on_error
         self.use_server_filenames = use_server_filenames
+        self.prefix_incomplete_posts = prefix_incomplete_posts
         self.session = requests.session()
         self.login()
 
@@ -206,18 +209,30 @@ class FantiaDownloader:
 
     def download_post(self, post_id):
         """Download a post to its own directory."""
+        self.output("Downloading post {}...\n".format(post_id))
+
         response = self.session.get(POST_API.format(post_id))
         response.raise_for_status()
         post_json = json.loads(response.text)["post"]
+
         post_id = post_json["id"]
         post_creator = post_json["fanclub"]["creator_name"]
-        self.output("Downloading post {}...\n".format(post_id))
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
-        post_description = post_json["comment"] or ""
-        post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), sanitize_for_path(str(post_id) + " - " + post_title))
 
+        post_directory_title = sanitize_for_path(str(post_id) + " - " + post_title)
+
+        if self.prefix_incomplete_posts:
+            for post in post_contents:
+                if post["visible_status"] != "visible":
+                    post_directory_title = INCOMPLETE_PREFIX + post_directory_title
+                    break
+
+        post_description = post_json["comment"] or ""
+
+        post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
         os.makedirs(post_directory, exist_ok=True)
+
         if self.dump_metadata:
             save_metadata(post_json, post_directory)
         if self.download_thumb and post_json["thumb"]:
