@@ -17,6 +17,7 @@ FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|po
 EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com)\/))[^\s]+)")
 
 INCOMPLETE_PREFIX = "[INCOMPLETE] "
+CRAWLJOB_FILENAME = "external_links.crawljob" # TODO: Set as flag
 
 LOGIN_URL = "https://fantia.jp/auth/login"
 LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}"
@@ -185,19 +186,33 @@ class FantiaDownloader:
 
     def download_post_content(self, post_json, post_directory):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
-        if post_json.get("category") == "photo_gallery":
-            photo_gallery_title = post_json["title"]
-            if not photo_gallery_title:
-                photo_gallery_title = str(post_json["id"])
-            photo_gallery = post_json["post_content_photos"]
-            photo_counter = 0
-            gallery_directory = os.path.join(post_directory, sanitize_for_path(photo_gallery_title))
-            os.makedirs(gallery_directory, exist_ok=True)
-            for photo in photo_gallery:
-                self.download_photo(photo, photo_counter, gallery_directory)
-                photo_counter += 1
-        elif post_json.get("category") == "file":
-            self.download_video(post_json, post_directory)
+        if post_json.get("visible_status") == "visible":
+            if post_json.get("category") == "photo_gallery":
+                photo_gallery_title = post_json["title"]
+                if not photo_gallery_title:
+                    photo_gallery_title = str(post_json["id"])
+                photo_gallery = post_json["post_content_photos"]
+                photo_counter = 0
+                gallery_directory = os.path.join(post_directory, sanitize_for_path(photo_gallery_title))
+                os.makedirs(gallery_directory, exist_ok=True)
+                for photo in photo_gallery:
+                    self.download_photo(photo, photo_counter, gallery_directory)
+                    photo_counter += 1
+            elif post_json.get("category") == "file":
+                self.download_video(post_json, post_directory)
+            elif post_json.get("category") == "embed":
+                # TODO: Check what URLs are allowed as embeds
+                link_as_list = [post_json["embed_url"]]
+                self.output("Adding {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
+                build_crawljob(link_as_list, self.directory, post_directory, self.autostart_crawljob)
+            else:
+                self.output("Post category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
+
+            if self.parse_for_external_links:
+                post_description = post_json["comment"] or ""
+                self.parse_external_links(post_description, os.path.abspath(post_directory))
+        else:
+            self.output("Post not available on current plan. Skipping...\n")
 
     def download_thumbnail(self, thumb_url, post_directory):
         """Download a thumbnail to the post's directory."""
@@ -228,8 +243,6 @@ class FantiaDownloader:
                     post_directory_title = INCOMPLETE_PREFIX + post_directory_title
                     break
 
-        post_description = post_json["comment"] or ""
-
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
         os.makedirs(post_directory, exist_ok=True)
 
@@ -238,6 +251,8 @@ class FantiaDownloader:
         if self.download_thumb and post_json["thumb"]:
             self.download_thumbnail(post_json["thumb"]["original"], post_directory)
         if self.parse_for_external_links:
+            # Main post
+            post_description = post_json["comment"] or ""
             self.parse_external_links(post_description, os.path.abspath(post_directory))
         for post in post_contents:
             self.download_post_content(post, post_directory)
@@ -278,7 +293,7 @@ def sanitize_for_path(value, replace=' '):
 
 def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
     """Append to a root .crawljob file with external links gathered from a post."""
-    filename = os.path.join(root_directory, "external_links.crawljob")
+    filename = os.path.join(root_directory, CRAWLJOB_FILENAME)
     with open(filename, "a", encoding="utf-8") as file:
         for link in links:
             crawl_dict = {
