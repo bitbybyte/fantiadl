@@ -16,7 +16,7 @@ import traceback
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
 EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com)\/))[^\s]+)")
 
-INCOMPLETE_PREFIX = "[INCOMPLETE] "
+INCOMPLETE_FLAG = False
 CRAWLJOB_FILENAME = "external_links.crawljob" # TODO: Set as flag
 
 LOGIN_URL = "https://fantia.jp/auth/login"
@@ -235,19 +235,13 @@ class FantiaDownloader:
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
 
-        post_directory_title = sanitize_for_path(str(post_id) + " - " + post_title)
-
-        if self.prefix_incomplete_posts:
-            for post in post_contents:
-                if post["visible_status"] != "visible":
-                    post_directory_title = INCOMPLETE_PREFIX + post_directory_title
-                    break
+        post_directory_title = sanitize_for_path(str(post_id))
 
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
         os.makedirs(post_directory, exist_ok=True)
 
         if self.dump_metadata:
-            save_metadata(post_json, post_directory)
+            save_metadata(post_json, post_directory, self.prefix_incomplete_posts)
         if self.download_thumb and post_json["thumb"]:
             self.download_thumbnail(post_json["thumb"]["original"], post_directory)
         if self.parse_for_external_links:
@@ -278,11 +272,23 @@ def guess_extension(mimetype):
     return MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
 
 
-def save_metadata(metadata, directory):
+def save_metadata(metadata, directory, prefix_incomplete_posts):
     """Save the metadata for a post to the post's directory."""
     filename = os.path.join(directory, "metadata.json")
+    incomplete_filename = os.path.join(directory, ".incomplete")
     with open(filename, "w") as file:
         json.dump(metadata, file, sort_keys=True, indent=4)
+    if prefix_incomplete_posts:
+        for post in metadata:
+            if post["visible_status"] != "visible":
+                INCOMPLETE_FLAG = True
+                break
+        if INCOMPLETE_FLAG:
+            if not os.path.exists(incomplete_filename):
+                open(incomplete_filename, 'a').close()
+        else:
+            if os.path.exists(incomplete_filename):
+                os.remove(incomplete_filename)
 
 
 def sanitize_for_path(value, replace=' '):
