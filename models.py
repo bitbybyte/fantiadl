@@ -16,7 +16,6 @@ import traceback
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
 EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com)\/))[^\s]+)")
 
-INCOMPLETE_FLAG = False
 CRAWLJOB_FILENAME = "external_links.crawljob" # TODO: Set as flag
 
 LOGIN_URL = "https://fantia.jp/auth/login"
@@ -274,6 +273,7 @@ def guess_extension(mimetype):
 
 def save_metadata(metadata, directory, prefix_incomplete_posts):
     """Save the metadata for a post to the post's directory."""
+    INCOMPLETE_FLAG = False
     filename = os.path.join(directory, "metadata.json")
     incomplete_filename = os.path.join(directory, ".incomplete")
     with open(filename, "w") as file:
