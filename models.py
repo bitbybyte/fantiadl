@@ -279,7 +279,7 @@ def save_metadata(metadata, directory, prefix_incomplete_posts):
     with open(filename, "w") as file:
         json.dump(metadata, file, sort_keys=True, indent=4)
     if prefix_incomplete_posts:
-        for post in metadata:
+        for post in metadata["post_contents"]:
             if post["visible_status"] != "visible":
                 INCOMPLETE_FLAG = True
                 break
