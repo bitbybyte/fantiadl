@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import requests
-
-from urllib.parse import urljoin
 from urllib.parse import unquote
+from urllib.parse import urljoin
+from urllib.parse import urlparse
 import json
 import mimetypes
 import os
@@ -39,6 +39,11 @@ MIMETYPES = {
     "video/mp4": ".mp4",
     "video/webm": ".webm"
 }
+
+
+class FantiaClub:
+    def __init__(self, fanclub_id):
+        self.id = fanclub_id
 
 
 class FantiaDownloader:
@@ -174,7 +179,7 @@ class FantiaDownloader:
         download_url = photo["url"]["original"]
         photo_header = self.session.head(download_url)
         mimetype = photo_header.headers["Content-Type"]
-        extension = guess_extension(mimetype)
+        extension = guess_extension(mimetype, download_url)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(download_url, filename, server_filename=self.use_server_filenames)
 
@@ -218,7 +223,7 @@ class FantiaDownloader:
         """Download a thumbnail to the post's directory."""
         thumb_header = self.session.head(thumb_url)
         mimetype = thumb_header.headers["Content-Type"]
-        extension = guess_extension(mimetype)
+        extension = guess_extension(mimetype, download_url)
         filename = os.path.join(post_directory, "thumb" + extension)
         self.perform_download(thumb_url, filename, server_filename=self.use_server_filenames)
 
@@ -268,15 +273,20 @@ class FantiaDownloader:
             build_crawljob(link_matches, self.directory, post_directory, self.autostart_crawljob)
 
 
-class FantiaClub:
-    def __init__(self, fanclub_id):
-        self.id = fanclub_id
+def guess_extension(mimetype, download_url):
+    """
+    Guess the file extension from the mimetype or force a specific extension for certain mimetypes.
+    If the mimetype returns no found extension, guess based on the download URL.
+    """
+    extension = MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
+    if not extension:
+        try:
+            path = urlparse(download_url).path
+            extension = os.path.splitext(path)[1]
+        except IndexError:
+            extension = ".unknown"
 
-
-def guess_extension(mimetype):
-    """Guess the file extension from the mimetype or force a specific extension for certain mimetypes."""
-    return MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
-
+    return extension
 
 def save_metadata(metadata, directory):
     """Save the metadata for a post to the post's directory."""
@@ -284,12 +294,10 @@ def save_metadata(metadata, directory):
     with open(filename, "w") as file:
         json.dump(metadata, file, sort_keys=True, indent=4)
 
-
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
     sanitized = re.sub(r'[<>\"\?\\\/\*:|]', replace, value)
     return re.sub(r'[\s.]+$', '', sanitized)
-
 
 def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
     """Append to a root .crawljob file with external links gathered from a post."""
