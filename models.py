@@ -16,7 +16,6 @@ import traceback
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
 EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com)\/))[^\s]+)")
 
-INCOMPLETE_PREFIX = "[INCOMPLETE] "
 CRAWLJOB_FILENAME = "external_links.crawljob" # TODO: Set as flag
 
 LOGIN_URL = "https://fantia.jp/auth/login"
@@ -47,7 +46,7 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, prefix_incomplete_posts=False):
+    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
         self.email = email
         self.password = password
         self.chunk_size = chunk_size
@@ -59,7 +58,7 @@ class FantiaDownloader:
         self.quiet = quiet
         self.continue_on_error = continue_on_error
         self.use_server_filenames = use_server_filenames
-        self.prefix_incomplete_posts = prefix_incomplete_posts
+        self.mark_incomplete_posts = mark_incomplete_posts
         self.session = requests.session()
         self.login()
 
@@ -240,19 +239,13 @@ class FantiaDownloader:
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
 
-        post_directory_title = sanitize_for_path(str(post_id) + " - " + post_title)
-
-        if self.prefix_incomplete_posts:
-            for post in post_contents:
-                if post["visible_status"] != "visible":
-                    post_directory_title = INCOMPLETE_PREFIX + post_directory_title
-                    break
+        post_directory_title = sanitize_for_path(str(post_id))
 
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
         os.makedirs(post_directory, exist_ok=True)
 
         if self.dump_metadata:
-            save_metadata(post_json, post_directory)
+            self.save_metadata(post_json, post_directory)
         if self.download_thumb and post_json["thumb"]:
             self.download_thumbnail(post_json["thumb"]["original"], post_directory)
         if self.parse_for_external_links:
@@ -272,6 +265,25 @@ class FantiaDownloader:
             self.output("Found {} external link(s) in post. Saving...\n".format(len(link_matches)))
             build_crawljob(link_matches, self.directory, post_directory, self.autostart_crawljob)
 
+    def save_metadata(metadata, directory):
+    """Save the metadata for a post to the post's directory."""
+    is_incomplete = False
+    filename = os.path.join(directory, "metadata.json")
+    incomplete_filename = os.path.join(directory, ".incomplete")
+    with open(filename, "w") as file:
+        json.dump(metadata, file, sort_keys=True, indent=4)
+    if self.mark_incomplete_posts:
+        for post in metadata["post_contents"]:
+            if post["visible_status"] != "visible":
+                is_incomplete = True
+                break
+        if is_incomplete:
+            if not os.path.exists(incomplete_filename):
+                open(incomplete_filename, 'a').close()
+        else:
+            if os.path.exists(incomplete_filename):
+                os.remove(incomplete_filename)
+
 
 def guess_extension(mimetype, download_url):
     """
@@ -285,14 +297,7 @@ def guess_extension(mimetype, download_url):
             extension = os.path.splitext(path)[1]
         except IndexError:
             extension = ".unknown"
-
     return extension
-
-def save_metadata(metadata, directory):
-    """Save the metadata for a post to the post's directory."""
-    filename = os.path.join(directory, "metadata.json")
-    with open(filename, "w") as file:
-        json.dump(metadata, file, sort_keys=True, indent=4)
 
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
