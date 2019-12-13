@@ -110,6 +110,7 @@ ENV/
 
 # Metadata
 *.json
+.incomplete
 
 # Logs
 *.log

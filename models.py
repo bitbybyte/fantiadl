@@ -265,24 +265,24 @@ class FantiaDownloader:
             self.output("Found {} external link(s) in post. Saving...\n".format(len(link_matches)))
             build_crawljob(link_matches, self.directory, post_directory, self.autostart_crawljob)
 
-    def save_metadata(metadata, directory):
-    """Save the metadata for a post to the post's directory."""
-    is_incomplete = False
-    filename = os.path.join(directory, "metadata.json")
-    incomplete_filename = os.path.join(directory, ".incomplete")
-    with open(filename, "w") as file:
-        json.dump(metadata, file, sort_keys=True, indent=4)
-    if self.mark_incomplete_posts:
-        for post in metadata["post_contents"]:
-            if post["visible_status"] != "visible":
-                is_incomplete = True
-                break
-        if is_incomplete:
-            if not os.path.exists(incomplete_filename):
-                open(incomplete_filename, 'a').close()
-        else:
-            if os.path.exists(incomplete_filename):
-                os.remove(incomplete_filename)
+    def save_metadata(self, metadata, directory):
+        """Save the metadata for a post to the post's directory."""
+        is_incomplete = False
+        filename = os.path.join(directory, "metadata.json")
+        incomplete_filename = os.path.join(directory, ".incomplete")
+        with open(filename, "w") as file:
+            json.dump(metadata, file, sort_keys=True, indent=4)
+        if self.mark_incomplete_posts:
+            for post in metadata["post_contents"]:
+                if post["visible_status"] != "visible":
+                    is_incomplete = True
+                    break
+            if is_incomplete:
+                if not os.path.exists(incomplete_filename):
+                    open(incomplete_filename, 'a').close()
+            else:
+                if os.path.exists(incomplete_filename):
+                    os.remove(incomplete_filename)
 
 
 def guess_extension(mimetype, download_url):
