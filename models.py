@@ -297,6 +297,7 @@ def guess_extension(mimetype, download_url):
             extension = os.path.splitext(path)[1]
         except IndexError:
             extension = ".unknown"
+    return extension
 
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
