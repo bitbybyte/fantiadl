@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import requests
-
-from urllib.parse import urljoin
 from urllib.parse import unquote
+from urllib.parse import urljoin
+from urllib.parse import urlparse
 import json
 import mimetypes
 import os
@@ -40,8 +40,13 @@ MIMETYPES = {
 }
 
 
+class FantiaClub:
+    def __init__(self, fanclub_id):
+        self.id = fanclub_id
+
+
 class FantiaDownloader:
-    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, prefix_incomplete_posts=False):
+    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
         self.email = email
         self.password = password
         self.chunk_size = chunk_size
@@ -53,7 +58,7 @@ class FantiaDownloader:
         self.quiet = quiet
         self.continue_on_error = continue_on_error
         self.use_server_filenames = use_server_filenames
-        self.prefix_incomplete_posts = prefix_incomplete_posts
+        self.mark_incomplete_posts = mark_incomplete_posts
         self.session = requests.session()
         self.login()
 
@@ -173,7 +178,7 @@ class FantiaDownloader:
         download_url = photo["url"]["original"]
         photo_header = self.session.head(download_url)
         mimetype = photo_header.headers["Content-Type"]
-        extension = guess_extension(mimetype)
+        extension = guess_extension(mimetype, download_url)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(download_url, filename, server_filename=self.use_server_filenames)
 
@@ -217,7 +222,7 @@ class FantiaDownloader:
         """Download a thumbnail to the post's directory."""
         thumb_header = self.session.head(thumb_url)
         mimetype = thumb_header.headers["Content-Type"]
-        extension = guess_extension(mimetype)
+        extension = guess_extension(mimetype, download_url)
         filename = os.path.join(post_directory, "thumb" + extension)
         self.perform_download(thumb_url, filename, server_filename=self.use_server_filenames)
 
@@ -240,7 +245,7 @@ class FantiaDownloader:
         os.makedirs(post_directory, exist_ok=True)
 
         if self.dump_metadata:
-            save_metadata(post_json, post_directory, self.prefix_incomplete_posts)
+            self.save_metadata(post_json, post_directory)
         if self.download_thumb and post_json["thumb"]:
             self.download_thumbnail(post_json["thumb"]["original"], post_directory)
         if self.parse_for_external_links:
@@ -260,30 +265,19 @@ class FantiaDownloader:
             self.output("Found {} external link(s) in post. Saving...\n".format(len(link_matches)))
             build_crawljob(link_matches, self.directory, post_directory, self.autostart_crawljob)
 
-
-class FantiaClub:
-    def __init__(self, fanclub_id):
-        self.id = fanclub_id
-
-
-def guess_extension(mimetype):
-    """Guess the file extension from the mimetype or force a specific extension for certain mimetypes."""
-    return MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
-
-
-def save_metadata(metadata, directory, prefix_incomplete_posts):
+    def save_metadata(metadata, directory):
     """Save the metadata for a post to the post's directory."""
-    INCOMPLETE_FLAG = False
+    is_incomplete = False
     filename = os.path.join(directory, "metadata.json")
     incomplete_filename = os.path.join(directory, ".incomplete")
     with open(filename, "w") as file:
         json.dump(metadata, file, sort_keys=True, indent=4)
-    if prefix_incomplete_posts:
+    if self.mark_incomplete_posts:
         for post in metadata["post_contents"]:
             if post["visible_status"] != "visible":
-                INCOMPLETE_FLAG = True
+                is_incomplete = True
                 break
-        if INCOMPLETE_FLAG:
+        if is_incomplete:
             if not os.path.exists(incomplete_filename):
                 open(incomplete_filename, 'a').close()
         else:
@@ -291,11 +285,23 @@ def save_metadata(metadata, directory, prefix_incomplete_posts):
                 os.remove(incomplete_filename)
 
 
+def guess_extension(mimetype, download_url):
+    """
+    Guess the file extension from the mimetype or force a specific extension for certain mimetypes.
+    If the mimetype returns no found extension, guess based on the download URL.
+    """
+    extension = MIMETYPES.get(mimetype) or mimetypes.guess_extension(mimetype, strict=True)
+    if not extension:
+        try:
+            path = urlparse(download_url).path
+            extension = os.path.splitext(path)[1]
+        except IndexError:
+            extension = ".unknown"
+
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
     sanitized = re.sub(r'[<>\"\?\\\/\*:|]', replace, value)
     return re.sub(r'[\s.]+$', '', sanitized)
-
 
 def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
     """Append to a root .crawljob file with external links gathered from a post."""
