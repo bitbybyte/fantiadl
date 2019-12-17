@@ -222,7 +222,7 @@ class FantiaDownloader:
         """Download a thumbnail to the post's directory."""
         thumb_header = self.session.head(thumb_url)
         mimetype = thumb_header.headers["Content-Type"]
-        extension = guess_extension(mimetype, download_url)
+        extension = guess_extension(mimetype, thumb_url)
         filename = os.path.join(post_directory, "thumb" + extension)
         self.perform_download(thumb_url, filename, server_filename=self.use_server_filenames)
 
