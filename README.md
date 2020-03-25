@@ -26,13 +26,13 @@ download options:
                         download using server defined filenames
   -r, --mark-incomplete-posts
                         add .incomplete file to post directories that are incomplete
-  -m, --dump-metadata   store metadata to file
+  -m, --dump-metadata   store metadata to file (including fanclub icon, header, and background)
   -x, --parse-for-external-links
                         parse post descriptions for external links
   -a, --autostart-crawljob
                         make links autostart when added to JDownloader
   -t, --download-thumbnail
-                        download post thumbnail
+                        download post thumbnails
   -f, --download-fanclubs
                         download posts from all followed fanclubs
 ```

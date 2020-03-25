@@ -96,10 +96,45 @@ class FantiaDownloader:
         else:
             sys.exit("Error: Failed to login. Please verify your username and password")
 
-    def download_fanclub_posts(self, fanclub, limit=0):
-        """Download each post from a fanclub."""
+    def process_content_type(self, url):
+        """Process the Content-Type from a request header and use it to build a filename."""
+        url_header = self.session.head(url)
+        mimetype = url_header.headers["Content-Type"]
+        extension = guess_extension(mimetype, url)
+        return extension
+
+    def download_fanclub_metadata(self, fanclub):
+        """Download fanclub header, icon, and custom background."""
+        response = self.session.get(FANCLUB_API.format(fanclub.id))
+        response.raise_for_status()
+        fanclub_json = json.loads(response.text)
+
+        fanclub_creator = fanclub_json["fanclub"]["creator_name"]
+        fanclub_directory = os.path.join(self.directory, sanitize_for_path(fanclub_creator))
+        os.makedirs(fanclub_directory, exist_ok=True)
+
+        self.save_metadata(fanclub_json, fanclub_directory)
+
+        header_url = fanclub_json["fanclub"]["cover"]["original"]
+        header_filename = os.path.join(fanclub_directory, "header" + self.process_content_type(header_url))
+        self.perform_download(header_url, header_filename, server_filename=self.use_server_filenames)
+
+        fanclub_icon_url = fanclub_json["fanclub"]["icon"]["original"]
+        fanclub_icon_filename = os.path.join(fanclub_directory, "icon" + self.process_content_type(fanclub_icon_url))
+        self.perform_download(fanclub_icon_url, fanclub_icon_filename, server_filename=self.use_server_filenames)
+
+        background_url = fanclub_json["fanclub"]["background"]
+        background_filename = os.path.join(fanclub_directory, "background" + self.process_content_type(background_url))
+        self.perform_download(background_url, background_filename, server_filename=self.use_server_filenames)
+
+    def download_fanclub(self, fanclub, limit=0):
+        """Download a fanclub."""
         self.output("Downloading fanclub {}...\n".format(fanclub.id))
         post_ids = self.fetch_fanclub_posts(fanclub)
+
+        if self.dump_metadata:
+            self.download_fanclub_metadata(fanclub)
+
         for post_id in post_ids if limit == 0 else post_ids[:limit]:
             try:
                 self.download_post(post_id)
@@ -114,7 +149,7 @@ class FantiaDownloader:
                     raise
 
     def download_followed_fanclubs(self, limit=0):
-        """Download posts from all followed fanclubs."""
+        """Download all followed fanclubs."""
         response = self.session.get(FANCLUBS_FOLLOWING_API)
         response.raise_for_status()
         fanclub_ids = json.loads(response.text)["fanclub_ids"]
@@ -122,7 +157,7 @@ class FantiaDownloader:
         for fanclub in fanclub_ids:
             try:
                 club = FantiaClub(fanclub)
-                self.download_fanclub_posts(club, limit)
+                self.download_fanclub(club, limit)
             except KeyboardInterrupt:
                 raise
             except:
@@ -175,12 +210,10 @@ class FantiaDownloader:
 
     def download_photo(self, photo, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
-        download_url = photo["url"]["original"]
-        photo_header = self.session.head(download_url)
-        mimetype = photo_header.headers["Content-Type"]
-        extension = guess_extension(mimetype, download_url)
+        photo_url = photo["url"]["original"]
+        extension = self.process_content_type(photo_url)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
-        self.perform_download(download_url, filename, server_filename=self.use_server_filenames)
+        self.perform_download(photo_url, filename, server_filename=self.use_server_filenames)
 
     def download_video(self, post, post_directory):
         """Download a video to the post's directory."""
@@ -220,9 +253,7 @@ class FantiaDownloader:
 
     def download_thumbnail(self, thumb_url, post_directory):
         """Download a thumbnail to the post's directory."""
-        thumb_header = self.session.head(thumb_url)
-        mimetype = thumb_header.headers["Content-Type"]
-        extension = guess_extension(mimetype, thumb_url)
+        extension = self.process_content_type(thumb_url)
         filename = os.path.join(post_directory, "thumb" + extension)
         self.perform_download(thumb_url, filename, server_filename=self.use_server_filenames)
 
@@ -246,6 +277,8 @@ class FantiaDownloader:
 
         if self.dump_metadata:
             self.save_metadata(post_json, post_directory)
+        if self.mark_incomplete_posts:
+            self.mark_incomplete_post(post_json, post_directory)
         if self.download_thumb and post_json["thumb"]:
             self.download_thumbnail(post_json["thumb"]["original"], post_directory)
         if self.parse_for_external_links:
@@ -267,22 +300,24 @@ class FantiaDownloader:
 
     def save_metadata(self, metadata, directory):
         """Save the metadata for a post to the post's directory."""
-        is_incomplete = False
         filename = os.path.join(directory, "metadata.json")
-        incomplete_filename = os.path.join(directory, ".incomplete")
         with open(filename, "w") as file:
             json.dump(metadata, file, sort_keys=True, indent=4)
-        if self.mark_incomplete_posts:
-            for post in metadata["post_contents"]:
-                if post["visible_status"] != "visible":
-                    is_incomplete = True
-                    break
-            if is_incomplete:
-                if not os.path.exists(incomplete_filename):
-                    open(incomplete_filename, 'a').close()
-            else:
-                if os.path.exists(incomplete_filename):
-                    os.remove(incomplete_filename)
+
+    def mark_incomplete_post(self, post_metadata, post_directory):
+        """Mark incomplete posts with a .incomplete file."""
+        is_incomplete = False
+        incomplete_filename = os.path.join(post_directory, ".incomplete")
+        for post in post_metadata["post_contents"]:
+            if post["visible_status"] != "visible":
+                is_incomplete = True
+                break
+        if is_incomplete:
+            if not os.path.exists(incomplete_filename):
+                open(incomplete_filename, 'a').close()
+        else:
+            if os.path.exists(incomplete_filename):
+                os.remove(incomplete_filename)
 
 
 def guess_extension(mimetype, download_url):
