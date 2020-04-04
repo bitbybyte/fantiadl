@@ -124,8 +124,10 @@ class FantiaDownloader:
         self.perform_download(fanclub_icon_url, fanclub_icon_filename, server_filename=self.use_server_filenames)
 
         background_url = fanclub_json["fanclub"]["background"]
-        background_filename = os.path.join(fanclub_directory, "background" + self.process_content_type(background_url))
-        self.perform_download(background_url, background_filename, server_filename=self.use_server_filenames)
+
+        if background_url:
+            background_filename = os.path.join(fanclub_directory, "background" + self.process_content_type(background_url))
+            self.perform_download(background_url, background_filename, server_filename=self.use_server_filenames)
 
     def download_fanclub(self, fanclub, limit=0):
         """Download a fanclub."""
