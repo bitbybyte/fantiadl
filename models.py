@@ -188,6 +188,10 @@ class FantiaDownloader:
     def perform_download(self, url, filename, server_filename=False):
         """Perform a download for the specified URL while showing progress."""
         request = self.session.get(url, stream=True)
+
+        if request.status_code == 404:
+            return
+
         request.raise_for_status()
 
         if server_filename:
