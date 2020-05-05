@@ -118,16 +118,19 @@ class FantiaDownloader:
         header_url = fanclub_json["fanclub"]["cover"]["original"]
         if header_url:
             header_filename = os.path.join(fanclub_directory, "header" + self.process_content_type(header_url))
+            self.output("Downloading fanclub header...\n")
             self.perform_download(header_url, header_filename, server_filename=self.use_server_filenames)
 
         fanclub_icon_url = fanclub_json["fanclub"]["icon"]["original"]
         if fanclub_icon_url:
             fanclub_icon_filename = os.path.join(fanclub_directory, "icon" + self.process_content_type(fanclub_icon_url))
+            self.output("Downloading fanclub icon...\n")
             self.perform_download(fanclub_icon_url, fanclub_icon_filename, server_filename=self.use_server_filenames)
 
         background_url = fanclub_json["fanclub"]["background"]
         if background_url:
             background_filename = os.path.join(fanclub_directory, "background" + self.process_content_type(background_url))
+            self.output("Downloading fanclub background...\n")
             self.perform_download(background_url, background_filename, server_filename=self.use_server_filenames)
 
     def download_fanclub(self, fanclub, limit=0):
@@ -190,6 +193,7 @@ class FantiaDownloader:
         request = self.session.get(url, stream=True)
 
         if request.status_code == 404:
+            self.output("Download URL returned 404. Skipping...\n")
             return
 
         request.raise_for_status()
