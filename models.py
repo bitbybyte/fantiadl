@@ -91,7 +91,7 @@ class FantiaDownloader:
                 sys.exit("Error: Failed to retrieve session key from callback")
 
             check_user = self.session.get(ME_API)
-            if not check_user.ok or check_user.status_code == 304:
+            if not (check_user.ok or check_user.status_code == 304):
                 sys.exit("Error: Invalid session")
         else:
             sys.exit("Error: Failed to login. Please verify your username and password")
