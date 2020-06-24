@@ -65,8 +65,12 @@ class FantiaDownloader:
     def output(self, output):
         """Write output to the console."""
         if not self.quiet:
-            sys.stdout.write(output)
-            sys.stdout.flush()
+            try:
+                sys.stdout.write(output.encode(sys.stdout.encoding, errors="backslashreplace").decode(sys.stdout.encoding))
+                sys.stdout.flush()
+            except UnicodeEncodeError or UnicodeDecodeError:
+                sys.stdout.buffer.write(output.encode("utf-8"))
+                sys.stdout.flush()
 
     def login(self):
         """Login to Fantia using the provided email and password."""
