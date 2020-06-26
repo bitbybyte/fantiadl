@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# from bs4 import BeautifulSoup
 import requests
+
 from urllib.parse import unquote
 from urllib.parse import urljoin
 from urllib.parse import urlparse
+import http.cookiejar
 import json
 import mimetypes
 import os
@@ -18,8 +21,10 @@ EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:meg
 
 CRAWLJOB_FILENAME = "external_links.crawljob" # TODO: Set as flag
 
-LOGIN_URL = "https://fantia.jp/auth/login"
-LOGIN_CALLBACK_URL = "https://fantia.jp/auth/toranoana/callback?code={}&state={}"
+BASE_URL = "https://fantia.jp/"
+
+LOGIN_SIGNIN_URL = "https://fantia.jp/sessions/signin"
+LOGIN_SESSION_URL = "https://fantia.jp/sessions"
 
 ME_API = "https://fantia.jp/api/v1/me"
 
@@ -46,9 +51,11 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, email, password, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
-        self.email = email
-        self.password = password
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
+    # def __init__(self, email, password, session_cookie=None, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
+        # self.email = email
+        # self.password = password
+        self.session_arg = session_arg
         self.chunk_size = chunk_size
         self.dump_metadata = dump_metadata
         self.parse_for_external_links = parse_for_external_links
@@ -74,31 +81,45 @@ class FantiaDownloader:
 
     def login(self):
         """Login to Fantia using the provided email and password."""
-        login = self.session.get(LOGIN_URL)
-        auth_url = login.url.replace("id.fantia.jp/auth/", "id.fantia.jp/authorize")
 
-        login_json = {
-            "Email": self.email,
-            "Password": self.password
-        }
+        try:
+            with open(self.session_arg, "r") as cookies_file:
+                cookies = http.cookiejar.MozillaCookieJar(self.session_arg)
+                cookies.load()
+                self.session.cookies = cookies
+        except FileNotFoundError:
+            login_cookie = requests.cookies.create_cookie(domain="fantia.jp", name="_session_id", value=self.session_arg)
+            self.session.cookies.set_cookie(login_cookie)
 
-        login_headers = {
-            "X-Not-Redirection": "true"
-        }
+        check_user = self.session.get(ME_API)
+        if not (check_user.ok or check_user.status_code == 304):
+            sys.exit("Error: Invalid session. Please verify your session cookie")
 
-        auth_response = self.session.post(auth_url, json=login_json, headers=login_headers).json()
-        if auth_response["status"] == "OK":
-            auth_payload = auth_response["payload"]
+        # Login flow, requires reCAPTCHA token
 
-            callback = self.session.get(LOGIN_CALLBACK_URL.format(auth_payload["code"], auth_payload["state"]))
-            if not callback.cookies["_session_id"]:
-                sys.exit("Error: Failed to retrieve session key from callback")
+        # login_json = {
+        #     "utf8": "✓",
+        #     "button": "",
+        #     "user[email]": self.email,
+        #     "user[password]": self.password,
+        # }
 
-            check_user = self.session.get(ME_API)
-            if not (check_user.ok or check_user.status_code == 304):
-                sys.exit("Error: Invalid session")
-        else:
-            sys.exit("Error: Failed to login. Please verify your username and password")
+        # login_session = self.session.get(LOGIN_SIGNIN_URL)
+        # login_page = BeautifulSoup(login_session.text, "html.parser")
+        # authenticity_token = login_page.select_one("input[name=\"authenticity_token\"]")["value"]
+        # print(login_page.select_one("input[name=\"recaptcha_response\"]"))
+        # login_json["authenticity_token"] = authenticity_token
+        # login_json["recaptcha_response"] = ...
+
+        # create_session = self.session.post(LOGIN_SESSION_URL, data=login_json)
+        # if not create_session.headers.get("Location"):
+        #     sys.exit("Error: Bad login form data")
+        # elif create_session.headers["Location"] == LOGIN_SIGNIN_URL:
+        #     sys.exit("Error: Failed to login. Please verify your username and password")
+
+        # check_user = self.session.get(ME_API)
+        # if not (check_user.ok or check_user.status_code == 304):
+        #     sys.exit("Error: Invalid session")
 
     def process_content_type(self, url):
         """Process the Content-Type from a request header and use it to build a filename."""

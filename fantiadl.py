@@ -14,7 +14,7 @@ __author__ = "bitbybyte"
 __copyright__ = "Copyright 2020 bitbybyte"
 
 __license__ = "MIT"
-__version__ = "1.4.3"
+__version__ = "1.5"
 
 BASE_HOST = "fantia.jp"
 
@@ -23,9 +23,10 @@ if __name__ == "__main__":
     cmdl_version = __version__
     cmdl_parser = argparse.ArgumentParser(usage=cmdl_usage, conflict_handler="resolve")
 
-    cmdl_parser.add_argument("-e", "--email", dest="email", metavar="EMAIL", help="fantia email")
-    cmdl_parser.add_argument("-p", "--password", dest="password", metavar="PASSWORD", help="fantia password")
-    cmdl_parser.add_argument("-n", "--netrc", action="store_true", dest="netrc", help="login with .netrc")
+    cmdl_parser.add_argument("-c", "--cookie", dest="session_arg", metavar="SESSION_COOKIE", help="_session_id cookie or cookies.txt")
+    cmdl_parser.add_argument("-e", "--email", dest="email", metavar="EMAIL", help=argparse.SUPPRESS)
+    cmdl_parser.add_argument("-p", "--password", dest="password", metavar="PASSWORD", help=argparse.SUPPRESS)
+    cmdl_parser.add_argument("-n", "--netrc", action="store_true", dest="netrc", help=argparse.SUPPRESS)
     cmdl_parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="suppress output")
     cmdl_parser.add_argument("-v", "--version", action="version", version=cmdl_version)
     cmdl_parser.add_argument("url", action="store", nargs="*", help="fanclub or post URL")
@@ -44,27 +45,35 @@ if __name__ == "__main__":
 
     cmdl_opts = cmdl_parser.parse_args()
 
+    session_arg = cmdl_opts.session_arg
     email = cmdl_opts.email
     password = cmdl_opts.password
+
+    if (email or password or cmdl_opts.netrc) and not session_arg:
+        sys.exit("Logging in from the command line is no longer supported. Please provide a session cookie using -c/--cookie. See the README for more information.")
 
     if not cmdl_opts.download_fanclubs and not cmdl_opts.url:
         sys.exit("Error: No valid input provided")
 
-    if cmdl_opts.netrc:
-        login = netrc.netrc().authenticators(BASE_HOST)
-        if login:
-            email = login[0]
-            password = login[2]
-        else:
-            sys.exit("Error: No Fantia login found in .netrc")
-    else:
-        if not email:
-            email = input("Email: ")
-        if not password:
-            password = getpass.getpass("Password: ")
+    if not session_arg:
+        session_arg = input("Fantia session cookie (_session_id or cookies.txt path): ")
+
+    # if cmdl_opts.netrc:
+    #     login = netrc.netrc().authenticators(BASE_HOST)
+    #     if login:
+    #         email = login[0]
+    #         password = login[2]
+    #     else:
+    #         sys.exit("Error: No Fantia login found in .netrc")
+    # else:
+    #     if not email:
+    #         email = input("Email: ")
+    #     if not password:
+    #         password = getpass.getpass("Password: ")
 
     try:
-        downloader = models.FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts)
+        downloader = models.FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts)
+        # downloader = models.FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts)
         if cmdl_opts.download_fanclubs:
             try:
                 downloader.download_followed_fanclubs(limit=cmdl_opts.limit)
