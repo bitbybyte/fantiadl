@@ -244,9 +244,8 @@ class FantiaDownloader:
                 self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
         self.output("\n")
 
-    def download_photo(self, photo, photo_counter, gallery_directory):
+    def download_photo(self, photo_url, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
-        photo_url = photo["url"]["original"]
         extension = self.process_content_type(photo_url)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(photo_url, filename, server_filename=self.use_server_filenames)
@@ -269,7 +268,8 @@ class FantiaDownloader:
                 gallery_directory = os.path.join(post_directory, sanitize_for_path(photo_gallery_title))
                 os.makedirs(gallery_directory, exist_ok=True)
                 for photo in photo_gallery:
-                    self.download_photo(photo, photo_counter, gallery_directory)
+                    photo_url = photo["url"]["original"]
+                    self.download_photo(photo_url, photo_counter, gallery_directory)
                     photo_counter += 1
             elif post_json.get("category") == "file":
                 self.download_video(post_json, post_directory)
@@ -278,6 +278,20 @@ class FantiaDownloader:
                 link_as_list = [post_json["embed_url"]]
                 self.output("Adding {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
                 build_crawljob(link_as_list, self.directory, post_directory, self.autostart_crawljob)
+            elif post_json.get("category") == "blog":
+                blog_gallery_title = post_json["parent_post"]["title"]
+                if not blog_gallery_title:
+                    blog_gallery_title = str(post_json["id"])
+                blog_comment = post_json["comment"]
+                blog_json = json.loads(blog_comment)
+                photo_counter = 0
+                gallery_directory = os.path.join(post_directory, sanitize_for_path(blog_gallery_title))
+                os.makedirs(gallery_directory, exist_ok=True)
+                for op in blog_json["ops"]:
+                    if "fantiaImage" in op["insert"]:
+                        photo_url = op["insert"]["fantiaImage"]["url"]
+                        self.download_photo(photo_url, photo_counter, gallery_directory)
+                        photo_counter += 1
             else:
                 self.output("Post category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
 
