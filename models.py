@@ -287,7 +287,7 @@ class FantiaDownloader:
                 if not photo_gallery_title:
                     photo_gallery_title = str(post_json["id"])
                 comment = post_json["comment"]
-                eval_comment = eval(comment)
+                eval_comment = json.loads(comment)
                 photo_counter = 0
                 gallery_directory = os.path.join(post_directory, sanitize_for_path(photo_gallery_title))
                 os.makedirs(gallery_directory, exist_ok=True)
