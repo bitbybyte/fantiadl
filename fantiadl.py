@@ -33,15 +33,16 @@ if __name__ == "__main__":
 
     dl_group = cmdl_parser.add_argument_group("download options")
     dl_group.add_argument("-i", "--ignore-errors", action="store_true", dest="continue_on_error", help="continue on download errors")
-    dl_group.add_argument("-l", "--limit", dest="limit", metavar='N', type=int, default=0, help="limit the number of posts to process")
+    dl_group.add_argument("-l", "--limit", dest="limit", metavar='N', type=int, default=0, help="limit the number of posts to process per fanclub")
     dl_group.add_argument("-o", "--output-directory", dest="output_path", help="directory to download to")
     dl_group.add_argument("-s", "--use-server-filenames", action="store_true", dest="use_server_filenames", help="download using server defined filenames")
     dl_group.add_argument("-r", "--mark-incomplete-posts", action="store_true", dest="mark_incomplete_posts", help="add .incomplete file to post directories that are incomplete")
     dl_group.add_argument("-m", "--dump-metadata", action="store_true", dest="dump_metadata", help="store metadata to file (including fanclub icon, header, and background)")
     dl_group.add_argument("-x", "--parse-for-external-links", action="store_true", dest="parse_for_external_links", help="parse post descriptions for external links")
-    dl_group.add_argument("-a", "--autostart-crawljob", action="store_true", dest="autostart_crawljob", help="make links autostart when added to JDownloader")
     dl_group.add_argument("-t", "--download-thumbnail", action="store_true", dest="download_thumb", help="download post thumbnails")
     dl_group.add_argument("-f", "--download-fanclubs", action="store_true", dest="download_fanclubs", help="download posts from all followed fanclubs")
+    dl_group.add_argument("-p", "--download-paid-fanclubs", action="store_true", dest="download_paid_fanclubs", help="download posts from all fanclubs backed on a paid plan")
+
 
     cmdl_opts = cmdl_parser.parse_args()
 
@@ -52,7 +53,7 @@ if __name__ == "__main__":
     if (email or password or cmdl_opts.netrc) and not session_arg:
         sys.exit("Logging in from the command line is no longer supported. Please provide a session cookie using -c/--cookie. See the README for more information.")
 
-    if not cmdl_opts.download_fanclubs and not cmdl_opts.url:
+    if not (cmdl_opts.download_fanclubs or cmdl_opts.download_paid_fanclubs) and not cmdl_opts.url:
         sys.exit("Error: No valid input provided")
 
     if not session_arg:
@@ -72,8 +73,7 @@ if __name__ == "__main__":
     #         password = getpass.getpass("Password: ")
 
     try:
-        downloader = models.FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts)
-        # downloader = models.FantiaDownloader(email=email, password=password, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, autostart_crawljob=cmdl_opts.autostart_crawljob, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts)
+        downloader = models.FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts)
         if cmdl_opts.download_fanclubs:
             try:
                 downloader.download_followed_fanclubs(limit=cmdl_opts.limit)
@@ -82,6 +82,16 @@ if __name__ == "__main__":
             except:
                 if cmdl_opts.continue_on_error:
                     downloader.output("Encountered an error downloading followed fanclubs. Skipping...\n")
+                    traceback.print_exc()
+                    pass
+                else:
+                    raise
+        elif cmdl_opts.download_paid_fanclubs:
+            try:
+                downloader.download_paid_fanclubs(limit=cmdl_opts.limit)
+            except:
+                if cmdl_opts.continue_on_error:
+                    downloader.output("Encountered an error downloading paid fanclubs. Skipping...\n")
                     traceback.print_exc()
                     pass
                 else:

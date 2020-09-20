@@ -16,7 +16,7 @@ optional arguments:
 
 download options:
   -i, --ignore-errors   continue on download errors
-  -l N, --limit N       limit the number of posts to process
+  -l N, --limit N       limit the number of posts to process per fanclub
   -o OUTPUT_PATH, --output-directory OUTPUT_PATH
                         directory to download to
   -s, --use-server-filenames
@@ -26,12 +26,12 @@ download options:
   -m, --dump-metadata   store metadata to file (including fanclub icon, header, and background)
   -x, --parse-for-external-links
                         parse post descriptions for external links
-  -a, --autostart-crawljob
-                        make links autostart when added to JDownloader
   -t, --download-thumbnail
                         download post thumbnails
   -f, --download-fanclubs
                         download posts from all followed fanclubs
+  -p, --download-paid-fanclubs
+                        download posts from all fanclubs backed on a paid plan
 ```
 
 When parsing for external links using `-x`, a .crawljob file is created in your root directory (either the directory provided with `-o` or the directory the script is being run from) that can be parsed by [JDownloader](http://jdownloader.org/). As posts are parsed, links will be appended and assigned their appropriate post directories for download. You can import this file manually into JDownloader (File -> Load Linkcontainer) or setup the Folder Watch plugin to watch your root directory for .crawljob files.
@@ -68,6 +68,7 @@ Check the [releases page](https://github.com/bitbybyte/fantiadl/releases/latest)
 ## Build Requirements
  - Python 3.x
  - requests
+ - beautifulsoup4
 
 ## Roadmap
  - More robust logging

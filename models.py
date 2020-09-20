@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup
 import requests
 
 from urllib.parse import unquote
@@ -30,7 +30,8 @@ ME_API = "https://fantia.jp/api/v1/me"
 
 FANCLUB_API = "https://fantia.jp/api/v1/fanclubs/{}"
 FANCLUBS_FOLLOWING_API = "https://fantia.jp/api/v1/me/fanclubs"
-FANCLUB_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
+FANCLUBS_PAID_HTML = "https://fantia.jp/mypage/users/plans?type=not_free"
+FANCLUB_POSTS_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
 
 POST_API = "https://fantia.jp/api/v1/posts/{}"
 POST_URL = "https://fantia.jp/posts"
@@ -51,15 +52,13 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
-    # def __init__(self, email, password, session_cookie=None, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, autostart_crawljob=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
         self.chunk_size = chunk_size
         self.dump_metadata = dump_metadata
         self.parse_for_external_links = parse_for_external_links
-        self.autostart_crawljob = autostart_crawljob
         self.download_thumb = download_thumb
         self.directory = directory or ""
         self.quiet = quiet
@@ -185,10 +184,32 @@ class FantiaDownloader:
         response.raise_for_status()
         fanclub_ids = json.loads(response.text)["fanclub_ids"]
 
-        for fanclub in fanclub_ids:
+        for fanclub_id in fanclub_ids:
             try:
-                club = FantiaClub(fanclub)
-                self.download_fanclub(club, limit)
+                fanclub = FantiaClub(fanclub_id)
+                self.download_fanclub(fanclub, limit)
+            except KeyboardInterrupt:
+                raise
+            except:
+                if self.continue_on_error:
+                    self.output("Encountered an error downloading fanclub. Skipping...\n")
+                    traceback.print_exc()
+                    continue
+                else:
+                    raise
+
+    def download_paid_fanclubs(self, limit=0):
+        """Download all fanclubs backed on a paid plan."""
+        response = self.session.get(FANCLUBS_PAID_HTML)
+        response.raise_for_status()
+        response_page = BeautifulSoup(response.text, "html.parser")
+        fanclub_links = response_page.select("div.mb-5-children > div:nth-of-type(1) a[href^=\"/fanclubs\"]")
+
+        for fanclub_link in fanclub_links:
+            try:
+                fanclub_id = fanclub_link["href"].lstrip("/fanclubs/")
+                fanclub = FantiaClub(fanclub_id)
+                self.download_fanclub(fanclub, limit)
             except KeyboardInterrupt:
                 raise
             except:
@@ -204,7 +225,7 @@ class FantiaDownloader:
         all_posts = []
         page_number = 1
         while True:
-            response = self.session.get(FANCLUB_HTML.format(fanclub.id, page_number))
+            response = self.session.get(FANCLUB_POSTS_HTML.format(fanclub.id, page_number))
             response.raise_for_status()
             post_ids = re.findall(POST_URL_RE, response.text)
             if not post_ids:
@@ -244,8 +265,9 @@ class FantiaDownloader:
                 self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
         self.output("\n")
 
-    def download_photo(self, photo_url, photo_counter, gallery_directory):
+    def download_photo(self, photo, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
+        photo_url = photo["url"]["original"]
         extension = self.process_content_type(photo_url)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(photo_url, filename, server_filename=self.use_server_filenames)
@@ -268,8 +290,7 @@ class FantiaDownloader:
                 gallery_directory = os.path.join(post_directory, sanitize_for_path(photo_gallery_title))
                 os.makedirs(gallery_directory, exist_ok=True)
                 for photo in photo_gallery:
-                    photo_url = photo["url"]["original"]
-                    self.download_photo(photo_url, photo_counter, gallery_directory)
+                    self.download_photo(photo, photo_counter, gallery_directory)
                     photo_counter += 1
             elif post_json.get("category") == "file":
                 self.download_video(post_json, post_directory)
@@ -277,29 +298,15 @@ class FantiaDownloader:
                 # TODO: Check what URLs are allowed as embeds
                 link_as_list = [post_json["embed_url"]]
                 self.output("Adding {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
-                build_crawljob(link_as_list, self.directory, post_directory, self.autostart_crawljob)
-            elif post_json.get("category") == "blog":
-                blog_gallery_title = post_json["parent_post"]["title"]
-                if not blog_gallery_title:
-                    blog_gallery_title = str(post_json["id"])
-                blog_comment = post_json["comment"]
-                blog_json = json.loads(blog_comment)
-                photo_counter = 0
-                gallery_directory = os.path.join(post_directory, sanitize_for_path(blog_gallery_title))
-                os.makedirs(gallery_directory, exist_ok=True)
-                for op in blog_json["ops"]:
-                    if "fantiaImage" in op["insert"]:
-                        photo_url = op["insert"]["fantiaImage"]["url"]
-                        self.download_photo(photo_url, photo_counter, gallery_directory)
-                        photo_counter += 1
+                build_crawljob(link_as_list, self.directory, post_directory)
             else:
-                self.output("Post category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
+                self.output("Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
 
             if self.parse_for_external_links:
                 post_description = post_json["comment"] or ""
                 self.parse_external_links(post_description, os.path.abspath(post_directory))
         else:
-            self.output("Post not available on current plan. Skipping...\n")
+            self.output("Post content not available on current plan. Skipping...\n")
 
     def download_thumbnail(self, thumb_url, post_directory):
         """Download a thumbnail to the post's directory."""
@@ -346,7 +353,7 @@ class FantiaDownloader:
         link_matches = EXTERNAL_LINKS_RE.findall(post_description)
         if link_matches:
             self.output("Found {} external link(s) in post. Saving...\n".format(len(link_matches)))
-            build_crawljob(link_matches, self.directory, post_directory, self.autostart_crawljob)
+            build_crawljob(link_matches, self.directory, post_directory)
 
     def save_metadata(self, metadata, directory):
         """Save the metadata for a post to the post's directory."""
@@ -389,7 +396,7 @@ def sanitize_for_path(value, replace=' '):
     sanitized = re.sub(r'[<>\"\?\\\/\*:|]', replace, value)
     return re.sub(r'[\s.]+$', '', sanitized)
 
-def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
+def build_crawljob(links, root_directory, post_directory):
     """Append to a root .crawljob file with external links gathered from a post."""
     filename = os.path.join(root_directory, CRAWLJOB_FILENAME)
     with open(filename, "a", encoding="utf-8") as file:
@@ -399,9 +406,9 @@ def build_crawljob(links, root_directory, post_directory, autostart_crawljob):
                 "text": link,
                 "downloadFolder": post_directory,
                 "enabled": "true",
-                "autoStart": str(autostart_crawljob).lower(),
-                "forcedStart": str(autostart_crawljob).lower(),
-                "autoConfirm": str(autostart_crawljob).lower(),
+                "autoStart": "true",
+                "forcedStart": "true",
+                "autoConfirm": "true",
                 "addOfflineLink": "true",
                 "extractAfterDownload": "false"
             }
