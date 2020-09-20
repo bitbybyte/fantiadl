@@ -296,10 +296,11 @@ class FantiaDownloader:
             elif post_json.get("category") == "file":
                 self.download_video(post_json, post_directory)
             elif post_json.get("category") == "embed":
-                # TODO: Check what URLs are allowed as embeds
-                link_as_list = [post_json["embed_url"]]
-                self.output("Adding embedded link {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
-                build_crawljob(link_as_list, self.directory, post_directory)
+                if self.parse_for_external_links:
+                    # TODO: Check what URLs are allowed as embeds
+                    link_as_list = [post_json["embed_url"]]
+                    self.output("Adding embedded link {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
+                    build_crawljob(link_as_list, self.directory, post_directory)
             else:
                 self.output("Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
 

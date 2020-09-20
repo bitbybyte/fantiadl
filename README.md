@@ -25,7 +25,7 @@ download options:
                         add .incomplete file to post directories that are incomplete
   -m, --dump-metadata   store metadata to file (including fanclub icon, header, and background)
   -x, --parse-for-external-links
-                        parse post descriptions for external links
+                        parse posts for external links
   -t, --download-thumbnail
                         download post thumbnails
   -f, --download-fanclubs
