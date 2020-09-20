@@ -19,8 +19,7 @@ import traceback
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
 EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com)\/))[^\s]+)")
 
-CRAWLJOB_FILENAME = "external_links.crawljob" # TODO: Set as flag
-
+DOMAIN = "fantia.jp"
 BASE_URL = "https://fantia.jp/"
 
 LOGIN_SIGNIN_URL = "https://fantia.jp/sessions/signin"
@@ -36,6 +35,8 @@ FANCLUB_POSTS_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
 POST_API = "https://fantia.jp/api/v1/posts/{}"
 POST_URL = "https://fantia.jp/posts"
 POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
+
+CRAWLJOB_FILENAME = "external_links.crawljob"
 
 MIMETYPES = {
     "image/jpeg": ".jpg",
@@ -87,7 +88,7 @@ class FantiaDownloader:
                 cookies.load()
                 self.session.cookies = cookies
         except FileNotFoundError:
-            login_cookie = requests.cookies.create_cookie(domain="fantia.jp", name="_session_id", value=self.session_arg)
+            login_cookie = requests.cookies.create_cookie(domain=DOMAIN, name="_session_id", value=self.session_arg)
             self.session.cookies.set_cookie(login_cookie)
 
         check_user = self.session.get(ME_API)
@@ -297,7 +298,7 @@ class FantiaDownloader:
             elif post_json.get("category") == "embed":
                 # TODO: Check what URLs are allowed as embeds
                 link_as_list = [post_json["embed_url"]]
-                self.output("Adding {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
+                self.output("Adding embedded link {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
                 build_crawljob(link_as_list, self.directory, post_directory)
             else:
                 self.output("Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
