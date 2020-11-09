@@ -249,15 +249,16 @@ class FantiaDownloader:
             filename = os.path.join(os.path.dirname(filename), os.path.basename(unquote(request.url.split("?", 1)[0])))
 
         file_size = int(request.headers["Content-Length"])
-        if os.path.isfile(filename):
-            if os.stat(filename).st_size == file_size:
-                self.output("File found (skipping): {}\n".format(filename))
-                return
+        if os.path.isfile(filename) and os.stat(filename).st_size == file_size:
+            self.output("File found (skipping): {}\n".format(filename))
+            return
 
         self.output("File: {}\n".format(filename))
+        base_filename, original_extension = os.path.splitext(filename)
+        incomplete_filename = base_filename + ".incomplete"
 
         downloaded = 0
-        with open(filename, "wb") as file:
+        with open(incomplete_filename, "wb") as file:
             for chunk in request.iter_content(self.chunk_size):
                 downloaded += len(chunk)
                 file.write(chunk)
@@ -265,6 +266,7 @@ class FantiaDownloader:
                 percent = int(100 * downloaded / file_size)
                 self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
         self.output("\n")
+        os.rename(incomplete_filename, filename)
 
     def download_photo(self, photo, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
@@ -273,11 +275,11 @@ class FantiaDownloader:
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(photo_url, filename, server_filename=self.use_server_filenames)
 
-    def download_video(self, post, post_directory):
+    def download_file(self, post, post_directory):
         """Download a video to the post's directory."""
         filename = os.path.join(post_directory, post["filename"])
         download_url = urljoin(POST_URL, post["download_uri"])
-        self.perform_download(download_url, filename, server_filename=self.use_server_filenames)
+        self.perform_download(download_url, filename, server_filename=True) # Force serve filenames to prevent duplicate collision
 
     def download_post_content(self, post_json, post_directory):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
@@ -294,7 +296,7 @@ class FantiaDownloader:
                     self.download_photo(photo, photo_counter, gallery_directory)
                     photo_counter += 1
             elif post_json.get("category") == "file":
-                self.download_video(post_json, post_directory)
+                self.download_file(post_json, post_directory)
             elif post_json.get("category") == "embed":
                 if self.parse_for_external_links:
                     # TODO: Check what URLs are allowed as embeds
