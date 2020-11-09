@@ -75,7 +75,7 @@ class FantiaDownloader:
             try:
                 sys.stdout.write(output.encode(sys.stdout.encoding, errors="backslashreplace").decode(sys.stdout.encoding))
                 sys.stdout.flush()
-            except UnicodeEncodeError or UnicodeDecodeError:
+            except (UnicodeEncodeError, UnicodeDecodeError):
                 sys.stdout.buffer.write(output.encode("utf-8"))
                 sys.stdout.flush()
 
