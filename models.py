@@ -4,6 +4,7 @@
 from bs4 import BeautifulSoup
 import requests
 
+from datetime import datetime as dt
 from urllib.parse import unquote
 from urllib.parse import urljoin
 from urllib.parse import urlparse
@@ -34,7 +35,8 @@ FANCLUB_POSTS_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
 
 POST_API = "https://fantia.jp/api/v1/posts/{}"
 POST_URL = "https://fantia.jp/posts"
-POST_URL_RE = re.compile(r"href=['\"]\/posts\/([0-9]+)")
+POST_RELATIVE_URL = "/posts/"
+RENEW_STR = "更新"
 
 CRAWLJOB_FILENAME = "external_links.crawljob"
 
@@ -53,7 +55,7 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False):
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -66,6 +68,7 @@ class FantiaDownloader:
         self.continue_on_error = continue_on_error
         self.use_server_filenames = use_server_filenames
         self.mark_incomplete_posts = mark_incomplete_posts
+        self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
         self.session = requests.session()
         self.login()
 
@@ -224,15 +227,28 @@ class FantiaDownloader:
     def fetch_fanclub_posts(self, fanclub):
         """Iterate over a fanclub's HTML pages to fetch all post IDs."""
         all_posts = []
+        post_found = False
         page_number = 1
+        self.output("Collecting fanclub posts...\n")
         while True:
             response = self.session.get(FANCLUB_POSTS_HTML.format(fanclub.id, page_number))
             response.raise_for_status()
-            post_ids = re.findall(POST_URL_RE, response.text)
-            if not post_ids:
+            response_page = BeautifulSoup(response.text, "html.parser")
+            posts = response_page.select("div.post")
+            new_post_ids = []
+            for post in posts:
+                link = post.select_one("a.link-block")["href"]
+                post_id = link.lstrip(POST_RELATIVE_URL)
+                date_string = post.select_one("span.post-date").text.rstrip(RENEW_STR)
+                parsed_date = dt.strptime(date_string, "%Y-%m-%d %H:%M")
+                if not self.month_limit or (parsed_date.year == self.month_limit.year and parsed_date.month == self.month_limit.month):
+                    post_found = True
+                    new_post_ids.append(post_id)
+            all_posts += new_post_ids
+            if not posts or (not new_post_ids and post_found): # No new posts found and we've already collected a post
+                self.output("Collected {} posts.\n".format(len(all_posts)))
                 return all_posts
             else:
-                all_posts += post_ids
                 page_number += 1
 
     def perform_download(self, url, filename, server_filename=False):
