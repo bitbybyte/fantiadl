@@ -336,7 +336,7 @@ class FantiaDownloader:
                 gallery_directory = os.path.join(post_directory, sanitize_for_path(blog_gallery_title))
                 os.makedirs(gallery_directory, exist_ok=True)
                 for op in blog_json["ops"]:
-                    if "fantiaImage" in op["insert"]:
+                    if type(op["insert"]) is dict and op["insert"].get("fantiaImage"):
                         photo_url = op["insert"]["fantiaImage"]["url"]
                         self.download_photo(photo_url, photo_counter, gallery_directory)
                         photo_counter += 1
