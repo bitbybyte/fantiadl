@@ -14,6 +14,7 @@ import mimetypes
 import os
 import re
 import sys
+import time
 import traceback
 
 
@@ -283,6 +284,12 @@ class FantiaDownloader:
                 self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
         self.output("\n")
         os.rename(incomplete_filename, filename)
+
+        modification_time_string = request.headers["Last-Modified"]
+        modification_time = int(dt.strptime(modification_time_string, "%a, %d %b %Y %H:%M:%S %Z").timestamp())
+        if modification_time:
+            access_time = int(time.time())
+            os.utime(filename, times=(access_time, modification_time))
 
     def download_photo(self, photo_url, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
