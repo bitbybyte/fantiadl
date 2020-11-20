@@ -107,6 +107,7 @@ ENV/
 *.gif
 *.mp4
 *.webm
+*.incomplete
 
 # Metadata
 *.json
