@@ -297,10 +297,8 @@ class FantiaDownloader:
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
         self.perform_download(photo_url, filename, server_filename=self.use_server_filenames)
 
-    def download_file(self, post, post_directory):
-        """Download a video to the post's directory."""
-        filename = os.path.join(post_directory, post["filename"])
-        download_url = urljoin(POST_URL, post["download_uri"])
+    def download_file(self, download_url, filename, post_directory):
+        """Download a file to the post's directory."""
         self.perform_download(download_url, filename, server_filename=True) # Force serve filenames to prevent duplicate collision
 
     def download_post_content(self, post_json, post_directory):
@@ -319,7 +317,9 @@ class FantiaDownloader:
                     self.download_photo(photo_url, photo_counter, gallery_directory)
                     photo_counter += 1
             elif post_json.get("category") == "file":
-                self.download_file(post_json, post_directory)
+                filename = os.path.join(post_directory, post_json["filename"])
+                download_url = urljoin(POST_URL, post_json["download_uri"])
+                self.download_file(download_url, filename, post_directory)
             elif post_json.get("category") == "embed":
                 if self.parse_for_external_links:
                     # TODO: Check what URLs are allowed as embeds
