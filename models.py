@@ -70,7 +70,7 @@ class FantiaDownloader:
         self.use_server_filenames = use_server_filenames
         self.mark_incomplete_posts = mark_incomplete_posts
         self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
-        self.excluded_files = excluded
+        self.excluded_files = excluded if excluded is not None else []
         self.session = requests.session()
         self.login()
 
