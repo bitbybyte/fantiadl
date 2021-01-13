@@ -70,8 +70,15 @@ class FantiaDownloader:
         self.use_server_filenames = use_server_filenames
         self.mark_incomplete_posts = mark_incomplete_posts
         self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
+        self.ignored_files = self.load_ignored_files()
         self.session = requests.session()
         self.login()
+
+    def load_ignored_files(self) -> list:
+        """Loads a list of files to ignore when downloading"""
+        with open("ignored.txt", "r") as f:
+            data = [line.rstrip("\n") for line in f]
+        return data
 
     def output(self, output):
         """Write output to the console."""
@@ -262,8 +269,15 @@ class FantiaDownloader:
 
         request.raise_for_status()
 
+        url_path = unquote(request.url.split("?", 1)[0])
         if server_filename:
-            filename = os.path.join(os.path.dirname(filename), os.path.basename(unquote(request.url.split("?", 1)[0])))
+            filename = os.path.join(os.path.dirname(filename), os.path.basename(url_path))
+
+        # Check if should ignore
+        print(url_path.rpartition("/")[2])
+        if url_path.rpartition("/")[2] in self.ignored_files:
+            self.output("Ignored file found (skipping): {}\n".format(filename))
+            return 
 
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filename) and os.stat(filename).st_size == file_size:
