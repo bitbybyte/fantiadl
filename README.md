@@ -34,7 +34,7 @@ download options:
                         download posts from all fanclubs backed on a paid plan
   -d %Y-%m, --download-month %Y-%m
                         download posts only from a specific month, e.g. 2007-08
-  -x EXCLUDED_FILE, --exclude EXCLUDED_FILE
+  -e EXCLUDED_FILE, --exclude EXCLUDED_FILE
                         file containing a list of file names to exclude from downloading
 ```
 

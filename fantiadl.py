@@ -43,7 +43,7 @@ if __name__ == "__main__":
     dl_group.add_argument("-f", "--download-fanclubs", action="store_true", dest="download_fanclubs", help="download posts from all followed fanclubs")
     dl_group.add_argument("-p", "--download-paid-fanclubs", action="store_true", dest="download_paid_fanclubs", help="download posts from all fanclubs backed on a paid plan")
     dl_group.add_argument("-d", "--download-month", dest="month_limit", metavar='%Y-%m', help="download posts only from a specific month, e.g. 2007-08")
-    dl_group.add_argument("-x", "--exclude", dest="excluded_file", help="file containing a list of file names to exclude from downloading")
+    dl_group.add_argument("-e", "--exclude", dest="excluded_file", help="file containing a list of file names to exclude from downloading")
 
 
     cmdl_opts = cmdl_parser.parse_args()
