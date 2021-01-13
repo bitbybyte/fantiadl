@@ -56,7 +56,7 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None):
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, excluded=None):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -70,15 +70,9 @@ class FantiaDownloader:
         self.use_server_filenames = use_server_filenames
         self.mark_incomplete_posts = mark_incomplete_posts
         self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
-        self.ignored_files = self.load_ignored_files()
+        self.excluded_files = excluded
         self.session = requests.session()
         self.login()
-
-    def load_ignored_files(self) -> list:
-        """Loads a list of files to ignore when downloading"""
-        with open("ignored.txt", "r") as f:
-            data = [line.rstrip("\n") for line in f]
-        return data
 
     def output(self, output):
         """Write output to the console."""
@@ -273,11 +267,10 @@ class FantiaDownloader:
         if server_filename:
             filename = os.path.join(os.path.dirname(filename), os.path.basename(url_path))
 
-        # Check if should ignore
-        print(url_path.rpartition("/")[2])
-        if url_path.rpartition("/")[2] in self.ignored_files:
-            self.output("Ignored file found (skipping): {}\n".format(filename))
-            return 
+        # Check if should exclude from saving
+        if url_path.rpartition("/")[2] in self.excluded_files:
+            self.output("Excluded file found (skipping): {}\n".format(filename))
+            return
 
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filename) and os.stat(filename).st_size == file_size:
