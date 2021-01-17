@@ -42,8 +42,8 @@ if __name__ == "__main__":
     dl_group.add_argument("-t", "--download-thumbnail", action="store_true", dest="download_thumb", help="download post thumbnails")
     dl_group.add_argument("-f", "--download-fanclubs", action="store_true", dest="download_fanclubs", help="download posts from all followed fanclubs")
     dl_group.add_argument("-p", "--download-paid-fanclubs", action="store_true", dest="download_paid_fanclubs", help="download posts from all fanclubs backed on a paid plan")
-    dl_group.add_argument("-d", "--download-month", dest="month_limit", metavar='%Y-%m', help="download posts only from a specific month, e.g. 2007-08")
-    dl_group.add_argument("-e", "--exclude", dest="excluded_file", help="file containing a list of file names to exclude from downloading")
+    dl_group.add_argument("-d", "--download-month", dest="month_limit", metavar="%Y-%m", help="download posts only from a specific month, e.g. 2007-08")
+    dl_group.add_argument("--exclude", dest="exclude_file", metavar="EXCLUDE_FILE", help="file containing a list of server-defined filenames to exclude from downloading")
 
 
     cmdl_opts = cmdl_parser.parse_args()
@@ -51,7 +51,6 @@ if __name__ == "__main__":
     session_arg = cmdl_opts.session_arg
     email = cmdl_opts.email
     password = cmdl_opts.password
-    excluded = cmdl_opts.excluded_file
 
     if (email or password or cmdl_opts.netrc) and not session_arg:
         sys.exit("Logging in from the command line is no longer supported. Please provide a session cookie using -c/--cookie. See the README for more information.")
@@ -75,14 +74,8 @@ if __name__ == "__main__":
     #     if not password:
     #         password = getpass.getpass("Password: ")
 
-	# Read files to exclude
-    excluded_files = []
-    if excluded:
-        with open(excluded, "r") as f:
-            excluded_files = [line.rstrip("\n") for line in f]
-
     try:
-        downloader = models.FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts, month_limit=cmdl_opts.month_limit, excluded=excluded_files)
+        downloader = models.FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts, month_limit=cmdl_opts.month_limit, exclude_file=cmdl_opts.exclude_file)
         if cmdl_opts.download_fanclubs:
             try:
                 downloader.download_followed_fanclubs(limit=cmdl_opts.limit)
