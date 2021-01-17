@@ -34,8 +34,8 @@ download options:
                         download posts from all fanclubs backed on a paid plan
   -d %Y-%m, --download-month %Y-%m
                         download posts only from a specific month, e.g. 2007-08
-  -e EXCLUDED_FILE, --exclude EXCLUDED_FILE
-                        file containing a list of file names to exclude from downloading
+  --exclude EXCLUDE_FILE
+                        file containing a list of filenames to exclude from downloading
 ```
 
 When parsing for external links using `-x`, a .crawljob file is created in your root directory (either the directory provided with `-o` or the directory the script is being run from) that can be parsed by [JDownloader](http://jdownloader.org/). As posts are parsed, links will be appended and assigned their appropriate post directories for download. You can import this file manually into JDownloader (File -> Load Linkcontainer) or setup the Folder Watch plugin to watch your root directory for .crawljob files.
