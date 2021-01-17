@@ -56,7 +56,7 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None):
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -70,8 +70,11 @@ class FantiaDownloader:
         self.use_server_filenames = use_server_filenames
         self.mark_incomplete_posts = mark_incomplete_posts
         self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
+        self.exclude_file = exclude_file
+        self.exclusions = []
         self.session = requests.session()
         self.login()
+        self.create_exclusions()
 
     def output(self, output):
         """Write output to the console."""
@@ -125,6 +128,12 @@ class FantiaDownloader:
         # if not (check_user.ok or check_user.status_code == 304):
         #     sys.exit("Error: Invalid session")
 
+    def create_exclusions(self):
+        """Read files to exclude from downloading."""
+        if self.exclude_file:
+            with open(self.exclude_file, "r") as file:
+                self.exclusions = [line.rstrip("\n") for line in file]
+
     def process_content_type(self, url):
         """Process the Content-Type from a request header and use it to build a filename."""
         url_header = self.session.head(url)
@@ -148,19 +157,19 @@ class FantiaDownloader:
         if header_url:
             header_filename = os.path.join(fanclub_directory, "header" + self.process_content_type(header_url))
             self.output("Downloading fanclub header...\n")
-            self.perform_download(header_url, header_filename, server_filename=self.use_server_filenames)
+            self.perform_download(header_url, header_filename, use_server_filename=self.use_server_filenames)
 
         fanclub_icon_url = fanclub_json["fanclub"]["icon"]["original"]
         if fanclub_icon_url:
             fanclub_icon_filename = os.path.join(fanclub_directory, "icon" + self.process_content_type(fanclub_icon_url))
             self.output("Downloading fanclub icon...\n")
-            self.perform_download(fanclub_icon_url, fanclub_icon_filename, server_filename=self.use_server_filenames)
+            self.perform_download(fanclub_icon_url, fanclub_icon_filename, use_server_filename=self.use_server_filenames)
 
         background_url = fanclub_json["fanclub"]["background"]
         if background_url:
             background_filename = os.path.join(fanclub_directory, "background" + self.process_content_type(background_url))
             self.output("Downloading fanclub background...\n")
-            self.perform_download(background_url, background_filename, server_filename=self.use_server_filenames)
+            self.perform_download(background_url, background_filename, use_server_filename=self.use_server_filenames)
 
     def download_fanclub(self, fanclub, limit=0):
         """Download a fanclub."""
@@ -252,7 +261,7 @@ class FantiaDownloader:
             else:
                 page_number += 1
 
-    def perform_download(self, url, filename, server_filename=False):
+    def perform_download(self, url, filepath, use_server_filename=False):
         """Perform a download for the specified URL while showing progress."""
         request = self.session.get(url, stream=True)
 
@@ -262,16 +271,27 @@ class FantiaDownloader:
 
         request.raise_for_status()
 
-        if server_filename:
-            filename = os.path.join(os.path.dirname(filename), os.path.basename(unquote(request.url.split("?", 1)[0])))
+        url_path = unquote(request.url.split("?", 1)[0])
+        server_filename = os.path.basename(url_path)
+        filename = os.path.basename(filepath)
+        if use_server_filename:
+            filepath = os.path.join(os.path.dirname(filepath), server_filename)
 
-        file_size = int(request.headers["Content-Length"])
-        if os.path.isfile(filename) and os.stat(filename).st_size == file_size:
-            self.output("File found (skipping): {}\n".format(filename))
+        # Check if filename is in exclusion list
+        if server_filename in self.exclusions:
+            self.output("Server filename in exclusion list (skipping): {}\n".format(server_filename))
+            return
+        elif filename in self.exclusions:
+            self.output("Filename in exclusion list (skipping): {}\n".format(filename))
             return
 
-        self.output("File: {}\n".format(filename))
-        base_filename, original_extension = os.path.splitext(filename)
+        file_size = int(request.headers["Content-Length"])
+        if os.path.isfile(filepath) and os.stat(filepath).st_size == file_size:
+            self.output("File found (skipping): {}\n".format(filepath))
+            return
+
+        self.output("File: {}\n".format(filepath))
+        base_filename, original_extension = os.path.splitext(filepath)
         incomplete_filename = base_filename + ".incomplete"
 
         downloaded = 0
@@ -283,23 +303,23 @@ class FantiaDownloader:
                 percent = int(100 * downloaded / file_size)
                 self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
         self.output("\n")
-        os.rename(incomplete_filename, filename)
+        os.rename(incomplete_filename, filepath)
 
         modification_time_string = request.headers["Last-Modified"]
         modification_time = int(dt.strptime(modification_time_string, "%a, %d %b %Y %H:%M:%S %Z").timestamp())
         if modification_time:
             access_time = int(time.time())
-            os.utime(filename, times=(access_time, modification_time))
+            os.utime(filepath, times=(access_time, modification_time))
 
     def download_photo(self, photo_url, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
         extension = self.process_content_type(photo_url)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
-        self.perform_download(photo_url, filename, server_filename=self.use_server_filenames)
+        self.perform_download(photo_url, filename, use_server_filename=self.use_server_filenames)
 
     def download_file(self, download_url, filename, post_directory):
         """Download a file to the post's directory."""
-        self.perform_download(download_url, filename, server_filename=True) # Force serve filenames to prevent duplicate collision
+        self.perform_download(download_url, filename, use_server_filename=True) # Force serve filenames to prevent duplicate collision
 
     def download_post_content(self, post_json, post_directory):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
@@ -353,7 +373,7 @@ class FantiaDownloader:
         """Download a thumbnail to the post's directory."""
         extension = self.process_content_type(thumb_url)
         filename = os.path.join(post_directory, "thumb" + extension)
-        self.perform_download(thumb_url, filename, server_filename=self.use_server_filenames)
+        self.perform_download(thumb_url, filename, use_server_filename=self.use_server_filenames)
 
     def download_post(self, post_id):
         """Download a post to its own directory."""
