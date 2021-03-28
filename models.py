@@ -141,6 +141,28 @@ class FantiaDownloader:
         extension = guess_extension(mimetype, url)
         return extension
 
+    def collect_post_titles(self, post_metadata):
+        """
+        Collect all post titles to check for duplicate names and rename as necessary by appending a counter.
+        """
+        post_titles = []
+        for post in post_metadata["post_contents"]:
+            try:
+                potential_title = post["title"] or post["parent_post"]["title"]
+                if not potential_title:
+                    potential_title = str(post["id"])
+            except KeyError:
+                potential_title = str(post["id"])
+
+            title = potential_title
+            counter = 2
+            while title in post_titles:
+                title = potential_title + "_{}".format(counter)
+                counter += 1
+            post_titles.append(title)
+
+        return post_titles
+
     def download_fanclub_metadata(self, fanclub):
         """Download fanclub header, icon, and custom background."""
         response = self.session.get(FANCLUB_API.format(fanclub.id))
@@ -321,16 +343,13 @@ class FantiaDownloader:
         """Download a file to the post's directory."""
         self.perform_download(download_url, filename, use_server_filename=True) # Force serve filenames to prevent duplicate collision
 
-    def download_post_content(self, post_json, post_directory):
+    def download_post_content(self, post_json, post_directory, post_title):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
         if post_json.get("visible_status") == "visible":
             if post_json.get("category") == "photo_gallery":
-                photo_gallery_title = post_json["title"]
-                if not photo_gallery_title:
-                    photo_gallery_title = str(post_json["id"])
                 photo_gallery = post_json["post_content_photos"]
                 photo_counter = 0
-                gallery_directory = os.path.join(post_directory, sanitize_for_path(photo_gallery_title))
+                gallery_directory = os.path.join(post_directory, sanitize_for_path(post_title))
                 os.makedirs(gallery_directory, exist_ok=True)
                 for photo in photo_gallery:
                     photo_url = photo["url"]["original"]
@@ -347,13 +366,10 @@ class FantiaDownloader:
                     self.output("Adding embedded link {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
                     build_crawljob(link_as_list, self.directory, post_directory)
             elif post_json.get("category") == "blog":
-                blog_gallery_title = post_json["parent_post"]["title"]
-                if not blog_gallery_title:
-                    blog_gallery_title = str(post_json["id"])
                 blog_comment = post_json["comment"]
                 blog_json = json.loads(blog_comment)
                 photo_counter = 0
-                gallery_directory = os.path.join(post_directory, sanitize_for_path(blog_gallery_title))
+                gallery_directory = os.path.join(post_directory, sanitize_for_path(post_title))
                 os.makedirs(gallery_directory, exist_ok=True)
                 for op in blog_json["ops"]:
                     if type(op["insert"]) is dict and op["insert"].get("fantiaImage"):
@@ -393,6 +409,8 @@ class FantiaDownloader:
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
         os.makedirs(post_directory, exist_ok=True)
 
+        post_titles = self.collect_post_titles(post_json)
+
         if self.dump_metadata:
             self.save_metadata(post_json, post_directory)
         if self.mark_incomplete_posts:
@@ -403,8 +421,9 @@ class FantiaDownloader:
             # Main post
             post_description = post_json["comment"] or ""
             self.parse_external_links(post_description, os.path.abspath(post_directory))
-        for post in post_contents:
-            self.download_post_content(post, post_directory)
+        for post_index, post in enumerate(post_contents):
+            post_title = post_titles[post_index]
+            self.download_post_content(post, post_directory, post_title)
         if not os.listdir(post_directory):
             self.output("No content downloaded for post {}. Deleting directory.\n".format(post_id))
             os.rmdir(post_directory)
