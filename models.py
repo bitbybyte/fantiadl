@@ -136,8 +136,8 @@ class FantiaDownloader:
 
     def process_content_type(self, url):
         """Process the Content-Type from a request header and use it to build a filename."""
-        r = self.session.get(url)
-        mimetype = r.headers['content-type']
+        url_header = self.session.head(url, allow_redirects=True)
+        mimetype = url_header.headers["Content-Type"]
         extension = guess_extension(mimetype, url)
         return extension
 
