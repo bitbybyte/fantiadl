@@ -136,7 +136,7 @@ class FantiaDownloader:
 
     def process_content_type(self, url):
         """Process the Content-Type from a request header and use it to build a filename."""
-        url_header = self.session.head(url)
+        url_header = self.session.head(url, allow_redirects=True)
         mimetype = url_header.headers["Content-Type"]
         extension = guess_extension(mimetype, url)
         return extension
@@ -373,7 +373,7 @@ class FantiaDownloader:
                 os.makedirs(gallery_directory, exist_ok=True)
                 for op in blog_json["ops"]:
                     if type(op["insert"]) is dict and op["insert"].get("fantiaImage"):
-                        photo_url = op["insert"]["fantiaImage"]["url"]
+                        photo_url = urljoin(BASE_URL, op["insert"]["fantiaImage"]["original_url"])
                         self.download_photo(photo_url, photo_counter, gallery_directory)
                         photo_counter += 1
             else:
