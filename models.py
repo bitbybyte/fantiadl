@@ -373,7 +373,7 @@ class FantiaDownloader:
                 os.makedirs(gallery_directory, exist_ok=True)
                 for op in blog_json["ops"]:
                     if type(op["insert"]) is dict and op["insert"].get("fantiaImage"):
-                        photo_url = "https://fantia.jp/" + op["insert"]["fantiaImage"]["original_url"]
+                        photo_url = urljoin(BASE_URL, op["insert"]["fantiaImage"]["original_url"])
                         self.download_photo(photo_url, photo_counter, gallery_directory)
                         photo_counter += 1
             else:
