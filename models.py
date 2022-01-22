@@ -18,6 +18,8 @@ import time
 import traceback
 
 
+import fantiadl
+
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
 EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com|dropbox.com)\/))[^\s]+)")
 
@@ -38,6 +40,8 @@ POST_API = "https://fantia.jp/api/v1/posts/{}"
 POST_URL = "https://fantia.jp/posts"
 POST_RELATIVE_URL = "/posts/"
 RENEW_STR = "更新"
+
+USER_AGENT = "fantiadl/{}".format(fantiadl.__version__)
 
 CRAWLJOB_FILENAME = "external_links.crawljob"
 
@@ -73,6 +77,7 @@ class FantiaDownloader:
         self.exclude_file = exclude_file
         self.exclusions = []
         self.session = requests.session()
+        self.session.headers.update({"User-Agent": USER_AGENT})
         self.login()
         self.create_exclusions()
 
