@@ -60,7 +60,7 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None):
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None, mark_complete=None):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -75,6 +75,7 @@ class FantiaDownloader:
         self.mark_incomplete_posts = mark_incomplete_posts
         self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
         self.exclude_file = exclude_file
+        self.mark_complete = mark_complete
         self.exclusions = []
         self.session = requests.session()
         self.session.headers.update({"User-Agent": USER_AGENT})
@@ -315,7 +316,7 @@ class FantiaDownloader:
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filepath) and os.stat(filepath).st_size == file_size:
             self.output("File found (skipping): {}\n".format(filepath))
-            return
+            return filepath
 
         self.output("File: {}\n".format(filepath))
         base_filename, original_extension = os.path.splitext(filepath)
@@ -338,18 +339,22 @@ class FantiaDownloader:
             access_time = int(time.time())
             os.utime(filepath, times=(access_time, modification_time))
 
+        """return filepath of downloaded file"""
+        return filepath
+
     def download_photo(self, photo_url, photo_counter, gallery_directory):
-        """Download a photo to the post's directory."""
+        """Download a photo to the post's directory. and return filename"""
         extension = self.process_content_type(photo_url)
         filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
-        self.perform_download(photo_url, filename, use_server_filename=self.use_server_filenames)
+        return self.perform_download(photo_url, filename, use_server_filename=self.use_server_filenames)
 
     def download_file(self, download_url, filename, post_directory):
-        """Download a file to the post's directory."""
-        self.perform_download(download_url, filename, use_server_filename=True) # Force serve filenames to prevent duplicate collision
+        """Download a file to the post's directory. and return filename"""
+        return self.perform_download(download_url, filename, use_server_filename=True) # Force serve filenames to prevent duplicate collision
 
     def download_post_content(self, post_json, post_directory, post_title):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
+        downloadedFiles = []
         if post_json.get("visible_status") == "visible":
             if post_json.get("category") == "photo_gallery":
                 photo_gallery = post_json["post_content_photos"]
@@ -358,12 +363,12 @@ class FantiaDownloader:
                 os.makedirs(gallery_directory, exist_ok=True)
                 for photo in photo_gallery:
                     photo_url = photo["url"]["original"]
-                    self.download_photo(photo_url, photo_counter, gallery_directory)
+                    downloadedFiles.append(self.download_photo(photo_url, photo_counter, gallery_directory))
                     photo_counter += 1
             elif post_json.get("category") == "file":
                 filename = os.path.join(post_directory, post_json["filename"])
                 download_url = urljoin(POST_URL, post_json["download_uri"])
-                self.download_file(download_url, filename, post_directory)
+                downloadedFiles.append(self.download_file(download_url, filename, post_directory))
             elif post_json.get("category") == "embed":
                 if self.parse_for_external_links:
                     # TODO: Check what URLs are allowed as embeds
@@ -379,7 +384,7 @@ class FantiaDownloader:
                 for op in blog_json["ops"]:
                     if type(op["insert"]) is dict and op["insert"].get("fantiaImage"):
                         photo_url = urljoin(BASE_URL, op["insert"]["fantiaImage"]["original_url"])
-                        self.download_photo(photo_url, photo_counter, gallery_directory)
+                        downloadedFiles.append(self.download_photo(photo_url, photo_counter, gallery_directory))
                         photo_counter += 1
             else:
                 self.output("Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
@@ -389,6 +394,9 @@ class FantiaDownloader:
                 self.parse_external_links(post_description, os.path.abspath(post_directory))
         else:
             self.output("Post content not available on current plan. Skipping...\n")
+
+        if self.mark_complete:
+            self.mark_complete_post(downloadedFiles, post_directory)
 
     def download_thumbnail(self, thumb_url, post_directory):
         """Download a thumbnail to the post's directory."""
@@ -413,6 +421,10 @@ class FantiaDownloader:
 
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
         os.makedirs(post_directory, exist_ok=True)
+        if self.mark_complete:
+            if self.check_complete(post_directory):
+                self.output("Post already downloaded {}. Skipping post.\n".format(post_id))
+                return
 
         post_titles = self.collect_post_titles(post_json)
 
@@ -445,6 +457,26 @@ class FantiaDownloader:
         filename = os.path.join(directory, "metadata.json")
         with open(filename, "w") as file:
             json.dump(metadata, file, sort_keys=True, indent=4)
+
+    def check_complete(self, post_directory):
+        """check for .complete file"""
+        complete_filename = os.path.join(post_directory, ".complete")
+        if os.path.exists(complete_filename):
+            return True
+
+    def mark_complete_post(self, downloaded_files, post_directory):
+        """Mark post with a .complete file to skip it in further runs to save time"""
+        is_complete = True
+        for filepath in downloaded_files:
+            if not os.path.isfile(filepath):
+                is_complete = False
+        complete_filename = os.path.join(post_directory, ".complete")
+        if is_complete:
+            if not os.path.exists(complete_filename):
+                open(complete_filename, 'a').close()
+        else:
+            if os.path.exists(complete_filename):
+                os.remove(complete_filename)
 
     def mark_incomplete_post(self, post_metadata, post_directory):
         """Mark incomplete posts with a .incomplete file."""
