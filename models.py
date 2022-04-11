@@ -53,6 +53,8 @@ MIMETYPES = {
     "video/webm": ".webm"
 }
 
+UNICODE_CONTROL_MAP = dict.fromkeys(range(32))
+
 
 class FantiaClub:
     def __init__(self, fanclub_id):
@@ -479,6 +481,7 @@ def guess_extension(mimetype, download_url):
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
     sanitized = re.sub(r'[<>\"\?\\\/\*:|]', replace, value)
+    sanitized = sanitized.translate(UNICODE_CONTROL_MAP)
     return re.sub(r'[\s.]+$', '', sanitized)
 
 def build_crawljob(links, root_directory, post_directory):
