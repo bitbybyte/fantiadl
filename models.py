@@ -331,6 +331,8 @@ class FantiaDownloader:
                 percent = int(100 * downloaded / file_size)
                 self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
         self.output("\n")
+        if os.path.exists(filepath)
+            os.remove(filepath)
         os.rename(incomplete_filename, filepath)
 
         modification_time_string = request.headers["Last-Modified"]
