@@ -33,7 +33,7 @@ ME_API = "https://fantia.jp/api/v1/me"
 
 FANCLUB_API = "https://fantia.jp/api/v1/fanclubs/{}"
 FANCLUBS_FOLLOWING_API = "https://fantia.jp/api/v1/me/fanclubs"
-FANCLUBS_PAID_HTML = "https://fantia.jp/mypage/users/plans?type=not_free"
+FANCLUBS_PAID_HTML = "https://fantia.jp/mypage/users/plans?type=not_free&page={}"
 FANCLUB_POSTS_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
 
 POST_API = "https://fantia.jp/api/v1/posts/{}"
@@ -148,9 +148,7 @@ class FantiaDownloader:
         return extension
 
     def collect_post_titles(self, post_metadata):
-        """
-        Collect all post titles to check for duplicate names and rename as necessary by appending a counter.
-        """
+        """Collect all post titles to check for duplicate names and rename as necessary by appending a counter."""
         post_titles = []
         for post in post_metadata["post_contents"]:
             try:
@@ -242,18 +240,28 @@ class FantiaDownloader:
 
     def download_paid_fanclubs(self, limit=0):
         """Download all fanclubs backed on a paid plan."""
-        response = self.session.get(FANCLUBS_PAID_HTML)
-        response.raise_for_status()
-        response_page = BeautifulSoup(response.text, "html.parser")
-        fanclub_links = response_page.select("div.mb-5-children > div:nth-of-type(1) a[href^=\"/fanclubs\"]")
+        all_paid_fanclubs = []
+        page_number = 1
+        self.output("Collecting paid fanclubs...\n")
+        while True:
+            response = self.session.get(FANCLUBS_PAID_HTML.format(page_number))
+            response.raise_for_status()
+            response_page = BeautifulSoup(response.text, "html.parser")
+            fanclub_links = response_page.select("div.mb-5-children > div:nth-of-type(1) a[href^=\"/fanclubs\"]")
 
-        for fanclub_link in fanclub_links:
-            try:
+            for fanclub_link in fanclub_links:
                 fanclub_id = fanclub_link["href"].lstrip("/fanclubs/")
+                all_paid_fanclubs.append(fanclub_id)
+            if not fanclub_links:
+                self.output("Collected {} fanclubs.\n".format(len(all_paid_fanclubs)))
+                break
+            else:
+                page_number += 1
+
+        for fanclub_id in all_paid_fanclubs:
+            try:
                 fanclub = FantiaClub(fanclub_id)
                 self.download_fanclub(fanclub, limit)
-            except KeyboardInterrupt:
-                raise
             except:
                 if self.continue_on_error:
                     self.output("Encountered an error downloading fanclub. Skipping...\n")
