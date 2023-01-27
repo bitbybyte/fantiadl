@@ -37,7 +37,8 @@ FANCLUBS_PAID_HTML = "https://fantia.jp/mypage/users/plans?type=not_free&page={}
 FANCLUB_POSTS_HTML = "https://fantia.jp/fanclubs/{}/posts?page={}"
 
 POST_API = "https://fantia.jp/api/v1/posts/{}"
-POST_URL = "https://fantia.jp/posts"
+POST_URL = "https://fantia.jp/posts/{}"
+POSTS_URL = "https://fantia.jp/posts"
 POST_RELATIVE_URL = "/posts/"
 
 USER_AGENT = "fantiadl/{}".format(fantiadl.__version__)
@@ -373,7 +374,7 @@ class FantiaDownloader:
                     photo_counter += 1
             elif post_json.get("category") == "file":
                 filename = os.path.join(post_directory, post_json["filename"])
-                download_url = urljoin(POST_URL, post_json["download_uri"])
+                download_url = urljoin(POSTS_URL, post_json["download_uri"])
                 self.download_file(download_url, filename, post_directory)
             elif post_json.get("category") == "embed":
                 if self.parse_for_external_links:
@@ -411,7 +412,14 @@ class FantiaDownloader:
         """Download a post to its own directory."""
         self.output("Downloading post {}...\n".format(post_id))
 
-        response = self.session.get(POST_API.format(post_id))
+        post_html_response = self.session.get(POST_URL.format(post_id))
+        post_html_response.raise_for_status()
+        post_html = BeautifulSoup(post_html_response.text, "html.parser")
+        csrf_token = post_html.select_one("meta[name=\"csrf-token\"]")["content"]
+
+        response = self.session.get(POST_API.format(post_id), headers={
+            "X-CSRF-Token": csrf_token
+        })
         response.raise_for_status()
         post_json = json.loads(response.text)["post"]
 
