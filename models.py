@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter, Retry
 import requests
 
 from datetime import datetime as dt
@@ -78,8 +79,7 @@ class FantiaDownloader:
         self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
         self.exclude_file = exclude_file
         self.exclusions = []
-        self.session = requests.session()
-        self.session.headers.update({"User-Agent": USER_AGENT})
+        self.initialize_session()
         self.login()
         self.create_exclusions()
 
@@ -92,6 +92,21 @@ class FantiaDownloader:
             except (UnicodeEncodeError, UnicodeDecodeError):
                 sys.stdout.buffer.write(output.encode("utf-8"))
                 sys.stdout.flush()
+
+    def initialize_session(self):
+        self.session = requests.session()
+        self.session.headers.update({"User-Agent": USER_AGENT})
+        retries = Retry(
+            total=5,
+            connect=5,
+            read=5,
+            status_forcelist=[429, 500, 502, 503, 504, 507, 508],
+            backoff_factor=2, # retry delay = {backoff factor} * (2 ** ({retry number} - 1))
+            raise_on_status=True
+        )
+        self.session.mount("http://", HTTPAdapter(max_retries=retries))
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
 
     def login(self):
         """Login to Fantia using the provided email and password."""
