@@ -7,7 +7,7 @@ usage: fantiadl.py [options] url
 positional arguments:
   url                   fanclub or post URL
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -c SESSION_COOKIE, --cookie SESSION_COOKIE
                         _session_id cookie or cookies.txt
@@ -16,7 +16,7 @@ optional arguments:
 
 download options:
   -i, --ignore-errors   continue on download errors
-  -l N, --limit N       limit the number of posts to process per fanclub
+  -l #, --limit #       limit the number of posts to process per fanclub (excludes -n)
   -o OUTPUT_PATH, --output-directory OUTPUT_PATH
                         directory to download to
   -s, --use-server-filenames
@@ -32,8 +32,10 @@ download options:
                         download posts from all followed fanclubs
   -p, --download-paid-fanclubs
                         download posts from all fanclubs backed on a paid plan
+  -n #, --download-new-posts #
+                        download a specified number of new posts from your fanclub timeline [default: 24]
   -d %Y-%m, --download-month %Y-%m
-                        download posts only from a specific month, e.g. 2007-08
+                        download posts only from a specific month, e.g. 2007-08 (excludes -n)
   --exclude EXCLUDE_FILE
                         file containing a list of filenames to exclude from downloading
 ```
