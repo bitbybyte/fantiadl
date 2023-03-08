@@ -11,6 +11,7 @@ from urllib.parse import urljoin
 from urllib.parse import urlparse
 import http.cookiejar
 import json
+import math
 import mimetypes
 import os
 import re
@@ -41,6 +42,8 @@ POST_API = "https://fantia.jp/api/v1/posts/{}"
 POST_URL = "https://fantia.jp/posts/{}"
 POSTS_URL = "https://fantia.jp/posts"
 POST_RELATIVE_URL = "/posts/"
+
+TIMELINES_API = "https://fantia.jp/api/v1/me/timelines/posts?page={}&per=24"
 
 USER_AGENT = "fantiadl/{}".format(fantiadl.__version__)
 
@@ -281,6 +284,40 @@ class FantiaDownloader:
             except:
                 if self.continue_on_error:
                     self.output("Encountered an error downloading fanclub. Skipping...\n")
+                    traceback.print_exc()
+                    continue
+                else:
+                    raise
+
+    def download_new_posts(self, post_limit=24):
+        all_new_post_ids = []
+        total_pages = math.ceil(post_limit / 24)
+        page_number = 1
+        has_next = True
+        self.output("Downloading {} new posts...\n".format(post_limit))
+
+        while has_next and not len(all_new_post_ids) >= post_limit - 1:
+            response = self.session.get(TIMELINES_API.format(page_number))
+            response.raise_for_status()
+            json_response = json.loads(response.text)
+
+            posts = json_response["posts"]
+            has_next = json_response["has_next"]
+            for post in posts:
+                if len(all_new_post_ids) >= post_limit - 1:
+                    break
+                post_id = post["id"]
+                all_new_post_ids.append(post_id)
+            page_number += 1
+
+        for post_id in all_new_post_ids:
+            try:
+                self.download_post(post_id)
+            except KeyboardInterrupt:
+                raise
+            except:
+                if self.continue_on_error:
+                    self.output("Encountered an error downloading post. Skipping...\n")
                     traceback.print_exc()
                     continue
                 else:
