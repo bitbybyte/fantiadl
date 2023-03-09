@@ -97,6 +97,8 @@ class FantiaDownloader:
                 sys.stdout.flush()
 
     def initialize_session(self):
+        """Initialize session with necessary headers and config."""
+
         self.session = requests.session()
         self.session.headers.update({"User-Agent": USER_AGENT})
         retries = Retry(
@@ -110,10 +112,8 @@ class FantiaDownloader:
         self.session.mount("http://", HTTPAdapter(max_retries=retries))
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
-
     def login(self):
         """Login to Fantia using the provided email and password."""
-
         try:
             with open(self.session_arg, "r") as cookies_file:
                 cookies = http.cookiejar.MozillaCookieJar(self.session_arg)
