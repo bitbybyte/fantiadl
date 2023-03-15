@@ -19,11 +19,11 @@ import sys
 import time
 import traceback
 
-
 import fantiadl
 
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
-EXTERNAL_LINKS_RE = re.compile(r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com|dropbox.com)\/))[^\s]+)")
+EXTERNAL_LINKS_RE = re.compile(
+    r"(?:[\s]+)?((?:(?:https?://)?(?:(?:www\.)?(?:mega\.nz|mediafire\.com|(?:drive|docs)\.google\.com|youtube.com|dropbox.com)\/))[^\s]+)")
 
 DOMAIN = "fantia.jp"
 BASE_URL = "https://fantia.jp/"
@@ -66,7 +66,9 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None):
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False,
+                 download_thumb=False, no_directory=False, directory=None, quiet=True, continue_on_error=False,
+                 use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -74,6 +76,7 @@ class FantiaDownloader:
         self.dump_metadata = dump_metadata
         self.parse_for_external_links = parse_for_external_links
         self.download_thumb = download_thumb
+        self.no_directory = no_directory
         self.directory = directory or ""
         self.quiet = quiet
         self.continue_on_error = continue_on_error
@@ -364,7 +367,7 @@ class FantiaDownloader:
         server_filename = os.path.basename(url_path)
         filename = os.path.basename(filepath)
         if use_server_filename:
-            filepath = os.path.join(os.path.dirname(filepath), server_filename)
+            filepath = os.path.join(os.path.dirname(filepath), swapServerName(server_filename))
 
         # Check if filename is in exclusion list
         if server_filename in self.exclusions:
@@ -380,8 +383,13 @@ class FantiaDownloader:
             return
 
         self.output("File: {}\n".format(filepath))
+        if self.no_directory:
+            filepath = filepath.replace(self.directory, "_Origin_").replace(os.sep, " ").replace("_Origin_", self.directory+os.sep)
         base_filename, original_extension = os.path.splitext(filepath)
         incomplete_filename = base_filename + ".incomplete"
+
+        if not os.path.exists(os.path.dirname(filepath)):
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
         downloaded = 0
         with open(incomplete_filename, "wb") as file:
@@ -419,7 +427,7 @@ class FantiaDownloader:
                 photo_gallery = post_json["post_content_photos"]
                 photo_counter = 0
                 gallery_directory = os.path.join(post_directory, sanitize_for_path(post_title))
-                os.makedirs(gallery_directory, exist_ok=True)
+                # os.makedirs(gallery_directory, exist_ok=True)
                 for photo in photo_gallery:
                     photo_url = photo["url"]["original"]
                     self.download_photo(photo_url, photo_counter, gallery_directory)
@@ -439,14 +447,15 @@ class FantiaDownloader:
                 blog_json = json.loads(blog_comment)
                 photo_counter = 0
                 gallery_directory = os.path.join(post_directory, sanitize_for_path(post_title))
-                os.makedirs(gallery_directory, exist_ok=True)
+                # os.makedirs(gallery_directory, exist_ok=True)
                 for op in blog_json["ops"]:
                     if type(op["insert"]) is dict and op["insert"].get("fantiaImage"):
                         photo_url = urljoin(BASE_URL, op["insert"]["fantiaImage"]["original_url"])
                         self.download_photo(photo_url, photo_counter, gallery_directory)
                         photo_counter += 1
             else:
-                self.output("Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
+                self.output(
+                    "Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
 
             if self.parse_for_external_links:
                 post_description = post_json["comment"] or ""
@@ -483,7 +492,9 @@ class FantiaDownloader:
         post_directory_title = sanitize_for_path(str(post_id))
 
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
-        os.makedirs(post_directory, exist_ok=True)
+
+        if not self.no_directory:
+            os.makedirs(post_directory, exist_ok=True)
 
         post_titles = self.collect_post_titles(post_json)
 
@@ -500,7 +511,7 @@ class FantiaDownloader:
         for post_index, post in enumerate(post_contents):
             post_title = post_titles[post_index]
             self.download_post_content(post, post_directory, post_title)
-        if not os.listdir(post_directory):
+        if not self.no_directory and not os.listdir(post_directory):
             self.output("No content downloaded for post {}. Deleting directory.\n".format(post_id))
             os.rmdir(post_directory)
 
@@ -547,11 +558,13 @@ def guess_extension(mimetype, download_url):
             extension = ".unknown"
     return extension
 
+
 def sanitize_for_path(value, replace=' '):
     """Remove potentially illegal characters from a path."""
     sanitized = re.sub(r'[<>\"\?\\\/\*:|]', replace, value)
     sanitized = sanitized.translate(UNICODE_CONTROL_MAP)
     return re.sub(r'[\s.]+$', '', sanitized)
+
 
 def build_crawljob(links, root_directory, post_directory):
     """Append to a root .crawljob file with external links gathered from a post."""
@@ -573,3 +586,12 @@ def build_crawljob(links, root_directory, post_directory):
             for key, value in crawl_dict.items():
                 file.write(key + "=" + value + "\n")
             file.write("\n")
+
+
+def swapServerName(serverName):
+    base_filename, original_extension = os.path.splitext(serverName)
+    stringlist = base_filename.split('_', 1)
+    temp = stringlist[1]
+    stringlist[1] = stringlist[0]
+    stringlist[0] = temp
+    return "_".join(stringlist) + "." + original_extension
