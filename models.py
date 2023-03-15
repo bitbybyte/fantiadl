@@ -296,7 +296,7 @@ class FantiaDownloader:
         has_next = True
         self.output("Downloading {} new posts...\n".format(post_limit))
 
-        while has_next and not len(all_new_post_ids) >= post_limit - 1:
+        while has_next and not len(all_new_post_ids) >= post_limit:
             response = self.session.get(TIMELINES_API.format(page_number))
             response.raise_for_status()
             json_response = json.loads(response.text)
@@ -304,7 +304,7 @@ class FantiaDownloader:
             posts = json_response["posts"]
             has_next = json_response["has_next"]
             for post in posts:
-                if len(all_new_post_ids) >= post_limit - 1:
+                if len(all_new_post_ids) >= post_limit:
                     break
                 post_id = post["id"]
                 all_new_post_ids.append(post_id)

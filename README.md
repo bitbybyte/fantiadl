@@ -33,7 +33,7 @@ download options:
   -p, --download-paid-fanclubs
                         download posts from all fanclubs backed on a paid plan
   -n #, --download-new-posts #
-                        download a specified number of new posts from your fanclub timeline [default: 24]
+                        download a specified number of new posts from your fanclub timeline
   -d %Y-%m, --download-month %Y-%m
                         download posts only from a specific month, e.g. 2007-08 (excludes -n)
   --exclude EXCLUDE_FILE
