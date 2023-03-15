@@ -385,7 +385,7 @@ class FantiaDownloader:
 
         self.output("File: {}\n".format(filepath))
         if self.no_directory:
-            filepath = filepath.replace(self.directory+os.sep+self.post_creator, "_Origin_").replace(os.sep, " ").replace("_Origin_",self.directory+os.sep+self.post_creator+os.sep)
+            filepath = filepath.replace(self.directory+os.sep+sanitize_for_path(self.post_creator), "_Origin_").replace(os.sep, " ").replace("_Origin_",self.directory+os.sep+sanitize_for_path(self.post_creator)+os.sep)
         base_filename, original_extension = os.path.splitext(filepath)
         incomplete_filename = base_filename + ".incomplete"
 
