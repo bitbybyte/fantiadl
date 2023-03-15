@@ -14,7 +14,7 @@ __author__ = "bitbybyte"
 __copyright__ = "Copyright 2023 bitbybyte"
 
 __license__ = "MIT"
-__version__ = "1.8.3"
+__version__ = "1.8.4"
 
 BASE_HOST = "fantia.jp"
 
