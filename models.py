@@ -68,7 +68,7 @@ class FantiaClub:
 class FantiaDownloader:
     def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False,
                  download_thumb=False, no_directory=False, directory=None, quiet=True, continue_on_error=False,
-                 use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None):
+                 use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None, post_creator=""):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -88,6 +88,7 @@ class FantiaDownloader:
         self.initialize_session()
         self.login()
         self.create_exclusions()
+        self.post_creator = post_creator
 
     def output(self, output):
         """Write output to the console."""
@@ -384,7 +385,7 @@ class FantiaDownloader:
 
         self.output("File: {}\n".format(filepath))
         if self.no_directory:
-            filepath = filepath.replace(self.directory, "_Origin_").replace(os.sep, " ").replace("_Origin_", self.directory+os.sep)
+            filepath = filepath.replace(self.directory+os.sep+self.post_creator, "_Origin_").replace(os.sep, " ").replace("_Origin_",self.directory+os.sep+self.post_creator+os.sep)
         base_filename, original_extension = os.path.splitext(filepath)
         incomplete_filename = base_filename + ".incomplete"
 
@@ -485,13 +486,13 @@ class FantiaDownloader:
         post_json = json.loads(response.text)["post"]
 
         post_id = post_json["id"]
-        post_creator = post_json["fanclub"]["creator_name"]
+        self.post_creator = post_json["fanclub"]["creator_name"]
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
 
         post_directory_title = sanitize_for_path(str(post_id))
 
-        post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
+        post_directory = os.path.join(self.directory, sanitize_for_path(self.post_creator), post_directory_title)
 
         if not self.no_directory:
             os.makedirs(post_directory, exist_ok=True)
