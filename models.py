@@ -379,6 +379,16 @@ class FantiaDownloader:
             return
         request.raise_for_status()
 
+        # Handle redirection
+        if request.url != url:
+            url_path = unquote(request.url.split("?", 1)[0])
+            server_filename = os.path.basename(url_path)
+            if server_filename in self.exclusions:
+                self.output("Server filename in exclusion list (skipping): {}\n".format(server_filename))
+                return
+            if use_server_filename:
+                filepath = os.path.join(os.path.dirname(filepath), server_filename)
+
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filepath) and os.stat(filepath).st_size == file_size:
             self.output("File found (skipping): {}\n".format(filepath))
