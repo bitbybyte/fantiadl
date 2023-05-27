@@ -19,7 +19,7 @@ import sys
 import time
 import traceback
 
-
+from db import FantiaDatabase
 import fantiadl
 
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
@@ -66,7 +66,7 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None):
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None, db_path=None):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -82,6 +82,8 @@ class FantiaDownloader:
         self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
         self.exclude_file = exclude_file
         self.exclusions = []
+        self.db = FantiaDatabase(db_path)
+
         self.initialize_session()
         self.login()
         self.create_exclusions()
