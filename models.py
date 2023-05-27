@@ -352,17 +352,9 @@ class FantiaDownloader:
             else:
                 page_number += 1
 
-    def perform_download(self, url, filepath, use_server_filename=False):
+    def perform_download(self, url, filepath, use_server_filename=False, use_db=False):
         """Perform a download for the specified URL while showing progress."""
-        request = self.session.get(url, stream=True)
-
-        if request.status_code == 404:
-            self.output("Download URL returned 404. Skipping...\n")
-            return
-
-        request.raise_for_status()
-
-        url_path = unquote(request.url.split("?", 1)[0])
+        url_path = unquote(url.split("?", 1)[0])
         server_filename = os.path.basename(url_path)
         filename = os.path.basename(filepath)
         if use_server_filename:
@@ -376,14 +368,25 @@ class FantiaDownloader:
             self.output("Filename in exclusion list (skipping): {}\n".format(filename))
             return
 
+        if use_db and self.db.is_url_downloaded(url_path):
+            self.output("URL already downloaded. Skipping...\n")
+            return
+
+        request = self.session.get(url, stream=True)
+        if request.status_code == 404:
+            self.output("Download URL returned 404. Skipping...\n")
+            return
+        request.raise_for_status()
+
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filepath) and os.stat(filepath).st_size == file_size:
             self.output("File found (skipping): {}\n".format(filepath))
+            if use_db:
+                self.db.insert_url(url_path)
             return
 
         self.output("File: {}\n".format(filepath))
-        base_filename, original_extension = os.path.splitext(filepath)
-        incomplete_filename = base_filename + ".incomplete"
+        incomplete_filename = filepath + ".tmp"
 
         downloaded = 0
         with open(incomplete_filename, "wb") as file:
@@ -394,9 +397,16 @@ class FantiaDownloader:
                 percent = int(100 * downloaded / file_size)
                 self.output("\r|{0}{1}| {2}% ".format("\u2588" * done, " " * (25 - done), percent))
         self.output("\n")
+
+        if downloaded != file_size:
+            raise Exception("Downloaded file size mismatch (expected {}, got {})".format(file_size, downloaded))
+
         if os.path.exists(filepath):
             os.remove(filepath)
         os.rename(incomplete_filename, filepath)
+
+        if use_db:
+            self.db.insert_url(url_path)
 
         modification_time_string = request.headers["Last-Modified"]
         modification_time = int(dt.strptime(modification_time_string, "%a, %d %b %Y %H:%M:%S %Z").timestamp())
@@ -406,9 +416,15 @@ class FantiaDownloader:
 
     def download_photo(self, photo_url, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
-        extension = self.process_content_type(photo_url)
-        filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
-        self.perform_download(photo_url, filename, use_server_filename=self.use_server_filenames)
+        self.perform_download(
+            photo_url,
+            os.path.join(
+                gallery_directory,
+                str(photo_counter) + "." + photo_url.split("?", 1)[0].rsplit(".", 1)[1]
+            ) if gallery_directory else str(),
+            use_server_filename=self.use_server_filenames,
+            use_db=True
+        )
 
     def download_file(self, download_url, filename, post_directory):
         """Download a file to the post's directory."""
