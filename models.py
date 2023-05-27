@@ -6,6 +6,7 @@ from requests.adapters import HTTPAdapter, Retry
 import requests
 
 from datetime import datetime as dt
+from email.utils import parsedate_to_datetime
 from urllib.parse import unquote
 from urllib.parse import urljoin
 from urllib.parse import urlparse
@@ -432,8 +433,16 @@ class FantiaDownloader:
 
     def download_post_content(self, post_json, post_directory, post_title):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
-        if post_json.get("visible_status") == "visible":
-            if post_json.get("category") == "photo_gallery":
+        if self.db.is_post_content_downloaded(post_json["id"]):
+            self.output("\tContent %d already downloaded. Skipping...\n" % post_json["id"])
+            return True
+
+        if post_json["visible_status"] != "visible":
+            self.output("\tContent %d not available on current plan. Skipping...\n" % post_json["id"])
+            return False
+
+        match post_json["category"]:
+            case "photo_gallery":
                 photo_gallery = post_json["post_content_photos"]
                 photo_counter = 0
                 gallery_directory = os.path.join(post_directory, sanitize_for_path(post_title))
@@ -442,17 +451,17 @@ class FantiaDownloader:
                     photo_url = photo["url"]["original"]
                     self.download_photo(photo_url, photo_counter, gallery_directory)
                     photo_counter += 1
-            elif post_json.get("category") == "file":
+            case "file":
                 filename = os.path.join(post_directory, post_json["filename"])
                 download_url = urljoin(POSTS_URL, post_json["download_uri"])
                 self.download_file(download_url, filename, post_directory)
-            elif post_json.get("category") == "embed":
+            case "embed":
                 if self.parse_for_external_links:
                     # TODO: Check what URLs are allowed as embeds
                     link_as_list = [post_json["embed_url"]]
                     self.output("Adding embedded link {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
                     build_crawljob(link_as_list, self.directory, post_directory)
-            elif post_json.get("category") == "blog":
+            case "blog":
                 blog_comment = post_json["comment"]
                 blog_json = json.loads(blog_comment)
                 photo_counter = 0
@@ -463,14 +472,17 @@ class FantiaDownloader:
                         photo_url = urljoin(BASE_URL, op["insert"]["fantiaImage"]["original_url"])
                         self.download_photo(photo_url, photo_counter, gallery_directory)
                         photo_counter += 1
-            else:
+            case _:
                 self.output("Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
+                return False
 
-            if self.parse_for_external_links:
-                post_description = post_json["comment"] or ""
-                self.parse_external_links(post_description, os.path.abspath(post_directory))
-        else:
-            self.output("Post content not available on current plan. Skipping...\n")
+        self.db.insert_post_content(post_json["id"], post_json["parent_post"]["url"].rsplit("/", 1)[1], post_json["title"], post_json["category"], post_json["foreign_plan_price"], post_json["currency_code"])
+
+        if self.parse_for_external_links:
+            post_description = post_json["comment"] or ""
+            self.parse_external_links(post_description, os.path.abspath(post_directory))
+
+        return True
 
     def download_thumbnail(self, thumb_url, post_directory):
         """Download a thumbnail to the post's directory."""
@@ -480,6 +492,11 @@ class FantiaDownloader:
 
     def download_post(self, post_id):
         """Download a post to its own directory."""
+        db_post = self.db.find_post(post_id)
+        if db_post and db_post["download_complete"] == 1:
+            self.output("Post {} already downloaded. Skipping...\n".format(post_id))
+            return
+
         self.output("Downloading post {}...\n".format(post_id))
 
         post_html_response = self.session.get(POST_URL.format(post_id))
@@ -498,6 +515,10 @@ class FantiaDownloader:
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
 
+        post_converted_at = int(dt.fromisoformat(post_json["converted_at"]).timestamp())
+        if not db_post or db_post["converted_at"] != post_converted_at:
+            self.db.insert_post(post_id, post_title, post_json["fanclub"]["id"], int(parsedate_to_datetime(post_json["posted_at"]).timestamp()), post_converted_at)
+
         post_directory_title = sanitize_for_path(str(post_id))
 
         post_directory = os.path.join(self.directory, sanitize_for_path(post_creator), post_directory_title)
@@ -515,9 +536,15 @@ class FantiaDownloader:
             # Main post
             post_description = post_json["comment"] or ""
             self.parse_external_links(post_description, os.path.abspath(post_directory))
+
+        download_complete = True
         for post_index, post in enumerate(post_contents):
             post_title = post_titles[post_index]
-            self.download_post_content(post, post_directory, post_title)
+            if not self.download_post_content(post, post_directory, post_title):
+                download_complete = False
+        if download_complete:
+            self.db.update_post_download_complete(post_id, 1)
+
         if not os.listdir(post_directory):
             self.output("No content downloaded for post {}. Deleting directory.\n".format(post_id))
             os.rmdir(post_directory)
