@@ -515,9 +515,10 @@ class FantiaDownloader:
         post_title = post_json["title"]
         post_contents = post_json["post_contents"]
 
-        post_converted_at = int(dt.fromisoformat(post_json["converted_at"]).timestamp())
+        post_posted_at = int(parsedate_to_datetime(post_json["posted_at"]).timestamp())
+        post_converted_at = int(dt.fromisoformat(post_json["converted_at"]).timestamp()) if post_json["converted_at"] else post_posted_at
         if not db_post or db_post["converted_at"] != post_converted_at:
-            self.db.insert_post(post_id, post_title, post_json["fanclub"]["id"], int(parsedate_to_datetime(post_json["posted_at"]).timestamp()), post_converted_at)
+            self.db.insert_post(post_id, post_title, post_json["fanclub"]["id"], post_posted_at, post_converted_at)
 
         post_directory_title = sanitize_for_path(str(post_id))
 
