@@ -353,7 +353,7 @@ class FantiaDownloader:
             else:
                 page_number += 1
 
-    def perform_download(self, url, filepath, use_server_filename=False):
+    def perform_download(self, url, filepath, use_server_filename=False, append_server_extension=False):
         """Perform a download for the specified URL while showing progress."""
         url_path = unquote(url.split("?", 1)[0])
         server_filename = os.path.basename(url_path)
@@ -390,6 +390,9 @@ class FantiaDownloader:
                 return
             if use_server_filename:
                 filepath = os.path.join(os.path.dirname(filepath), server_filename)
+
+        if not use_server_filename and append_server_extension:
+            filepath += guess_extension(request.headers["Content-Type"], url)
 
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filepath) and os.stat(filepath).st_size == file_size:
@@ -429,14 +432,16 @@ class FantiaDownloader:
 
     def download_photo(self, photo_url, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
-        self.perform_download(
-            photo_url,
-            os.path.join(
-                gallery_directory,
-                str(photo_counter) + "." + photo_url.split("?", 1)[0].rsplit(".", 1)[1]
-            ) if gallery_directory else str(),
-            use_server_filename=self.use_server_filenames
-        )
+        # For S3 URLs, we can infer the extension from the URL.
+        # Otherwise, we need to figure it out from Content-Type.
+        use_server_extension = not photo_url.startswith("https://cc.fantia.jp/")
+
+        filepath = str(photo_counter)
+        if not use_server_extension:
+            filepath += "." + photo_url.split("?", 1)[0].rsplit(".", 1)[1]
+        filepath = os.path.join(gallery_directory, filepath)
+
+        self.perform_download(photo_url, filepath, self.use_server_filenames, use_server_extension)
 
     def download_file(self, download_url, filename, post_directory):
         """Download a file to the post's directory."""
