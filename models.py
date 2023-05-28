@@ -353,7 +353,7 @@ class FantiaDownloader:
             else:
                 page_number += 1
 
-    def perform_download(self, url, filepath, use_server_filename=False, use_db=False):
+    def perform_download(self, url, filepath, use_server_filename=False):
         """Perform a download for the specified URL while showing progress."""
         url_path = unquote(url.split("?", 1)[0])
         server_filename = os.path.basename(url_path)
@@ -369,6 +369,8 @@ class FantiaDownloader:
             self.output("Filename in exclusion list (skipping): {}\n".format(filename))
             return
 
+        # Currently, we only cache fantia S3 URLs
+        use_db = url_path.startswith("https://cc.fantia.jp/")
         if use_db and self.db.is_url_downloaded(url_path):
             self.output("URL already downloaded. Skipping...\n")
             return
@@ -433,8 +435,7 @@ class FantiaDownloader:
                 gallery_directory,
                 str(photo_counter) + "." + photo_url.split("?", 1)[0].rsplit(".", 1)[1]
             ) if gallery_directory else str(),
-            use_server_filename=self.use_server_filenames,
-            use_db=True
+            use_server_filename=self.use_server_filenames
         )
 
     def download_file(self, download_url, filename, post_directory):
