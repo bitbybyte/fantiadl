@@ -470,7 +470,8 @@ class FantiaDownloader:
         csrf_token = post_html.select_one("meta[name=\"csrf-token\"]")["content"]
 
         response = self.session.get(POST_API.format(post_id), headers={
-            "X-CSRF-Token": csrf_token
+            "X-CSRF-Token": csrf_token,
+            "X-Requested-With": "XMLHttpRequest"
         })
         response.raise_for_status()
         post_json = json.loads(response.text)["post"]
