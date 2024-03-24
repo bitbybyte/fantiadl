@@ -577,8 +577,8 @@ class FantiaDownloader:
     def save_metadata(self, metadata, directory):
         """Save the metadata for a post to the post's directory."""
         filename = os.path.join(directory, "metadata.json")
-        with open(filename, "w") as file:
-            json.dump(metadata, file, sort_keys=True, indent=4)
+        with open(filename, "w", encoding='utf-8') as file:
+            json.dump(metadata, file, sort_keys=True, ensure_ascii=False, indent=4)
 
     def mark_incomplete_post(self, post_metadata, post_directory):
         """Mark incomplete posts with a .incomplete file."""
