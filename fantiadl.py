@@ -29,7 +29,7 @@ if __name__ == "__main__":
     cmdl_parser.add_argument("-n", "--netrc", action="store_true", dest="netrc", help=argparse.SUPPRESS)
     cmdl_parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="suppress output")
     cmdl_parser.add_argument("-v", "--version", action="version", version=cmdl_version)
-    cmdl_parser.add_argument("--db", dest="db_path", help="sqlite3 db to store download status")
+    cmdl_parser.add_argument("--db", dest="db_path", help="database to track post download state")
     cmdl_parser.add_argument("url", action="store", nargs="*", help="fanclub or post URL")
 
     dl_group = cmdl_parser.add_argument_group("download options")

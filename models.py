@@ -20,7 +20,7 @@ import sys
 import time
 import traceback
 
-from db import FantiaDatabase
+from db import FantiaDlDatabase
 import fantiadl
 
 FANTIA_URL_RE = re.compile(r"(?:https?://(?:(?:www\.)?(?:fantia\.jp/(fanclubs|posts)/)))([0-9]+)")
@@ -83,7 +83,7 @@ class FantiaDownloader:
         self.month_limit = dt.strptime(month_limit, "%Y-%m") if month_limit else None
         self.exclude_file = exclude_file
         self.exclusions = []
-        self.db = FantiaDatabase(db_path)
+        self.db = FantiaDlDatabase(db_path)
 
         self.initialize_session()
         self.login()
@@ -270,6 +270,7 @@ class FantiaDownloader:
             response.raise_for_status()
             response_page = BeautifulSoup(response.text, "html.parser")
             fanclub_links = response_page.select("div.mb-5-children > div:nth-of-type(1) a[href^=\"/fanclubs\"]")
+            print(response.text)
 
             for fanclub_link in fanclub_links:
                 fanclub_id = fanclub_link["href"].lstrip("/fanclubs/")
@@ -369,9 +370,7 @@ class FantiaDownloader:
             self.output("Filename in exclusion list (skipping): {}\n".format(filename))
             return
 
-        # Currently, we only cache fantia S3 URLs
-        use_db = url_path.startswith("https://cc.fantia.jp/")
-        if use_db and self.db.is_url_downloaded(url_path):
+        if self.db.is_url_downloaded(url_path):
             self.output("URL already downloaded. Skipping...\n")
             return
 
@@ -381,7 +380,10 @@ class FantiaDownloader:
             return
         request.raise_for_status()
 
-        # Handle redirection
+        # Handle redirects so we can properly catch an excluded filename
+        # Attachments typically route from fantia.jp/posts/#/download/#
+        # Images typically are served directly from cc.fantia.jp
+        # Metadata images typically are served from c.fantia.jp
         if request.url != url:
             url_path = unquote(request.url.split("?", 1)[0])
             server_filename = os.path.basename(url_path)
@@ -397,12 +399,11 @@ class FantiaDownloader:
         file_size = int(request.headers["Content-Length"])
         if os.path.isfile(filepath) and os.stat(filepath).st_size == file_size:
             self.output("File found (skipping): {}\n".format(filepath))
-            if use_db:
-                self.db.insert_url(url_path)
+            self.db.insert_url(url_path)
             return
 
         self.output("File: {}\n".format(filepath))
-        incomplete_filename = filepath + ".tmp"
+        incomplete_filename = filepath + ".incomplete"
 
         downloaded = 0
         with open(incomplete_filename, "wb") as file:
@@ -421,8 +422,7 @@ class FantiaDownloader:
             os.remove(filepath)
         os.rename(incomplete_filename, filepath)
 
-        if use_db:
-            self.db.insert_url(url_path)
+        self.db.insert_url(url_path)
 
         modification_time_string = request.headers["Last-Modified"]
         modification_time = int(dt.strptime(modification_time_string, "%a, %d %b %Y %H:%M:%S %Z").timestamp())
@@ -432,16 +432,9 @@ class FantiaDownloader:
 
     def download_photo(self, photo_url, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
-        # For S3 URLs, we can infer the extension from the URL.
-        # Otherwise, we need to figure it out from Content-Type.
-        use_server_extension = not photo_url.startswith("https://cc.fantia.jp/")
-
-        filepath = str(photo_counter)
-        if not use_server_extension:
-            filepath += "." + photo_url.split("?", 1)[0].rsplit(".", 1)[1]
-        filepath = os.path.join(gallery_directory, filepath)
-
-        self.perform_download(photo_url, filepath, self.use_server_filenames, use_server_extension)
+        extension = self.process_content_type(photo_url)
+        filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
+        self.perform_download(photo_url, filename, use_server_filename=self.use_server_filenames)
 
     def download_file(self, download_url, filename, post_directory):
         """Download a file to the post's directory."""
@@ -449,16 +442,18 @@ class FantiaDownloader:
 
     def download_post_content(self, post_json, post_directory, post_title):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
+        self.output(f"> Content {post_json['id']}\n")
+
         if self.db.is_post_content_downloaded(post_json["id"]):
-            self.output("\tContent %d already downloaded. Skipping...\n" % post_json["id"])
+            self.output("Post content already downloaded. Skipping...\n")
             return True
 
         if post_json["visible_status"] != "visible":
-            self.output("\tContent %d not available on current plan. Skipping...\n" % post_json["id"])
+            self.output("Post content not available on current plan. Skipping...\n")
             return False
 
-        match post_json["category"]:
-            case "photo_gallery":
+        if post_json.get("category"):
+            if post_json["category"] == "photo_gallery":
                 photo_gallery = post_json["post_content_photos"]
                 photo_counter = 0
                 gallery_directory = os.path.join(post_directory, sanitize_for_path(post_title))
@@ -467,17 +462,17 @@ class FantiaDownloader:
                     photo_url = photo["url"]["original"]
                     self.download_photo(photo_url, photo_counter, gallery_directory)
                     photo_counter += 1
-            case "file":
+            elif post_json["category"] == "file":
                 filename = os.path.join(post_directory, post_json["filename"])
                 download_url = urljoin(POSTS_URL, post_json["download_uri"])
                 self.download_file(download_url, filename, post_directory)
-            case "embed":
+            elif post_json["category"] == "embed":
                 if self.parse_for_external_links:
                     # TODO: Check what URLs are allowed as embeds
                     link_as_list = [post_json["embed_url"]]
                     self.output("Adding embedded link {0} to {1}.\n".format(post_json["embed_url"], CRAWLJOB_FILENAME))
                     build_crawljob(link_as_list, self.directory, post_directory)
-            case "blog":
+            elif post_json["category"] == "blog":
                 blog_comment = post_json["comment"]
                 blog_json = json.loads(blog_comment)
                 photo_counter = 0
@@ -488,7 +483,7 @@ class FantiaDownloader:
                         photo_url = urljoin(BASE_URL, op["insert"]["fantiaImage"]["original_url"])
                         self.download_photo(photo_url, photo_counter, gallery_directory)
                         photo_counter += 1
-            case _:
+            else:
                 self.output("Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
                 return False
 
@@ -509,7 +504,7 @@ class FantiaDownloader:
     def download_post(self, post_id):
         """Download a post to its own directory."""
         db_post = self.db.find_post(post_id)
-        if db_post and db_post["download_complete"] == 1:
+        if db_post and db_post["download_complete"]:
             self.output("Post {} already downloaded. Skipping...\n".format(post_id))
             return
 
@@ -555,12 +550,12 @@ class FantiaDownloader:
             post_description = post_json["comment"] or ""
             self.parse_external_links(post_description, os.path.abspath(post_directory))
 
-        download_complete = True
+        download_complete_counter = 0
         for post_index, post in enumerate(post_contents):
             post_title = post_titles[post_index]
-            if not self.download_post_content(post, post_directory, post_title):
-                download_complete = False
-        if download_complete:
+            if self.download_post_content(post, post_directory, post_title):
+                download_complete_counter += 1
+        if download_complete_counter == len(post_contents):
             self.db.update_post_download_complete(post_id, 1)
 
         if not os.listdir(post_directory):

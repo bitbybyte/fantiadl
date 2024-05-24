@@ -1,7 +1,7 @@
 import time
 import sqlite3
 
-class FantiaDatabase:
+class FantiaDlDatabase:
     def __init__(self, db_path):
         if db_path is None:
             self.conn = None
@@ -12,7 +12,6 @@ class FantiaDatabase:
         self.cursor = self.conn.cursor()
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS urls (url TEXT PRIMARY KEY, timestamp INTEGER)")
-
         self.cursor.execute("CREATE TABLE IF NOT EXISTS posts (id INTEGER PRIMARY KEY, title TEXT, fanclub INTEGER, posted_at INTEGER, converted_at INTEGER, download_complete INTEGER, timestamp INTEGER)")
         self.cursor.execute("CREATE TABLE IF NOT EXISTS post_contents (id INTEGER PRIMARY KEY, parent_post INTEGER, title TEXT, category TEXT, price INTEGER, currency TEXT, timestamp INTEGER, FOREIGN KEY(parent_post) REFERENCES posts(id))")
 
@@ -22,7 +21,7 @@ class FantiaDatabase:
         if self.conn is not None:
             self.conn.close()
 
-    # assistant methods to compatibilize with no database mode
+    # Helper methods
 
     def execute(self, query, args):
         if self.conn is None:
@@ -36,7 +35,7 @@ class FantiaDatabase:
         self.cursor.execute(query, args)
         return self.cursor.fetchone()
 
-    # insert methods
+    # INSERT, REPLACE
 
     def insert_post(self, id, title, fanclub, posted_at, converted_at):
         self.execute("REPLACE INTO posts VALUES (?, ?, ?, ?, ?, 0, ?)", (id, title, fanclub, posted_at, converted_at, int(time.time())))
@@ -47,7 +46,7 @@ class FantiaDatabase:
     def insert_url(self, url):
         self.execute("INSERT INTO urls VALUES (?, ?)", (url, int(time.time())))
 
-    # select methods
+    # SELECT
 
     def find_post(self, id):
         return self.fetchone("SELECT * FROM posts WHERE id = ?", (id,))
@@ -58,7 +57,7 @@ class FantiaDatabase:
     def is_url_downloaded(self, url):
         return self.fetchone("SELECT timestamp FROM urls WHERE url = ?", (url,)) is not None
 
-    # update methods
+    # UPDATE
 
     def update_post_download_complete(self, id, download_complete):
         self.execute("UPDATE posts SET download_complete = ?, timestamp = ? WHERE id = ?", (download_complete, int(time.time()), id))
