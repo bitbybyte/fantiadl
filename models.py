@@ -370,7 +370,7 @@ class FantiaDownloader:
             self.output("Filename in exclusion list (skipping): {}\n".format(filename))
             return
 
-        if self.db.is_url_downloaded(url_path):
+        if self.db.conn and self.db.is_url_downloaded(url_path):
             self.output("URL already downloaded. Skipping...\n")
             return
 
@@ -403,7 +403,7 @@ class FantiaDownloader:
             return
 
         self.output("File: {}\n".format(filepath))
-        incomplete_filename = filepath + ".incomplete"
+        incomplete_filename = filepath + ".part"
 
         downloaded = 0
         with open(incomplete_filename, "wb") as file:
@@ -444,7 +444,7 @@ class FantiaDownloader:
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
         self.output(f"> Content {post_json['id']}\n")
 
-        if self.db.is_post_content_downloaded(post_json["id"]):
+        if self.db.conn and self.db.is_post_content_downloaded(post_json["id"]):
             self.output("Post content already downloaded. Skipping...\n")
             return True
 
@@ -504,7 +504,7 @@ class FantiaDownloader:
     def download_post(self, post_id):
         """Download a post to its own directory."""
         db_post = self.db.find_post(post_id)
-        if db_post and db_post["download_complete"]:
+        if self.db.conn and db_post and db_post["download_complete"]:
             self.output("Post {} already downloaded. Skipping...\n".format(post_id))
             return
 
@@ -529,7 +529,7 @@ class FantiaDownloader:
 
         post_posted_at = int(parsedate_to_datetime(post_json["posted_at"]).timestamp())
         post_converted_at = int(dt.fromisoformat(post_json["converted_at"]).timestamp()) if post_json["converted_at"] else post_posted_at
-        if not db_post or db_post["converted_at"] != post_converted_at:
+        if self.db.conn and (not db_post or db_post["converted_at"] != post_converted_at):
             self.db.insert_post(post_id, post_title, post_json["fanclub"]["id"], post_posted_at, post_converted_at)
 
         post_directory_title = sanitize_for_path(str(post_id))
@@ -555,8 +555,9 @@ class FantiaDownloader:
             post_title = post_titles[post_index]
             if self.download_post_content(post, post_directory, post_title):
                 download_complete_counter += 1
-        if download_complete_counter == len(post_contents):
-            self.db.update_post_download_complete(post_id, 1)
+        if self.db.conn and download_complete_counter == len(post_contents):
+            self.output("All post content appears to have been downloaded. Marking as complete in database...\n")
+            self.db.update_post_download_complete(post_id)
 
         if not os.listdir(post_directory):
             self.output("No content downloaded for post {}. Deleting directory.\n".format(post_id))
