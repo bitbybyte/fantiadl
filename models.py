@@ -536,6 +536,7 @@ class FantiaDownloader:
             if db_post["converted_at"] != post_converted_at:
                 self.output("Post date does not match date in database. Checking for new contents...\n")
                 self.db.update_post_download_complete(post_id, download_complete=0)
+                self.db.update_post_converted_at(post_id, post_converted_at)
             else:
                 self.output("Post appears to have been downloaded completely. Skipping...\n".format(post_id))
                 return

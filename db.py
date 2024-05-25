@@ -61,3 +61,6 @@ class FantiaDlDatabase:
 
     def update_post_download_complete(self, id, download_complete=1):
         self.execute("UPDATE posts SET download_complete = ?, timestamp = ? WHERE id = ?", (download_complete, int(time.time()), id))
+
+    def update_post_converted_at(self, id, converted_at):
+        self.execute("UPDATE posts SET converted_at = ?, timestamp = ? WHERE id = ?", (converted_at, int(time.time()), id))
