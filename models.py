@@ -271,7 +271,6 @@ class FantiaDownloader:
             response.raise_for_status()
             response_page = BeautifulSoup(response.text, "html.parser")
             fanclub_links = response_page.select("div.mb-5-children > div:nth-of-type(1) a[href^=\"/fanclubs\"]")
-            print(response.text)
 
             for fanclub_link in fanclub_links:
                 fanclub_id = fanclub_link["href"].lstrip("/fanclubs/")
