@@ -67,7 +67,7 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None, db_path=None):
+    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None, db_path=None, db_bypass_post_check=False):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -84,6 +84,7 @@ class FantiaDownloader:
         self.exclude_file = exclude_file
         self.exclusions = []
         self.db = FantiaDlDatabase(db_path)
+        self.db_bypass_post_check = db_bypass_post_check
 
         self.initialize_session()
         self.login()
@@ -503,6 +504,11 @@ class FantiaDownloader:
 
     def download_post(self, post_id):
         """Download a post to its own directory."""
+        db_post = self.db.find_post(post_id)
+        if self.db_bypass_post_check and self.db.conn and db_post and db_post["download_complete"]:
+            self.output("Post {} already downloaded. Skipping...\n".format(post_id))
+            return
+
         self.output("Downloading post {}...\n".format(post_id))
 
         post_html_response = self.session.get(POST_URL.format(post_id))
@@ -525,7 +531,6 @@ class FantiaDownloader:
         post_posted_at = int(parsedate_to_datetime(post_json["posted_at"]).timestamp())
         post_converted_at = int(dt.fromisoformat(post_json["converted_at"]).timestamp()) if post_json["converted_at"] else post_posted_at
 
-        db_post = self.db.find_post(post_id)
         if self.db.conn and db_post and db_post["download_complete"]:
             # Check if the post date changed, which may indicate new contents were added
             if db_post["converted_at"] != post_converted_at:

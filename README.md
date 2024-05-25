@@ -14,6 +14,8 @@ options:
   -q, --quiet           suppress output
   -v, --version         show program's version number and exit
   --db DB_PATH          database to track post download state
+  --db-bypass-post-check
+                        bypass the metadata fetch if post is marked as complete in the database
 
 download options:
   -i, --ignore-errors   continue on download errors

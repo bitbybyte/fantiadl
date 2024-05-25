@@ -30,6 +30,7 @@ if __name__ == "__main__":
     cmdl_parser.add_argument("-q", "--quiet", action="store_true", dest="quiet", help="suppress output")
     cmdl_parser.add_argument("-v", "--version", action="version", version=cmdl_version)
     cmdl_parser.add_argument("--db", dest="db_path", help="database to track post download state")
+    cmdl_parser.add_argument("--db-bypass-post-check", action="store_true", dest="db_bypass_post_check", help="bypass the metadata fetch if post is marked as complete in the database")
     cmdl_parser.add_argument("url", action="store", nargs="*", help="fanclub or post URL")
 
     dl_group = cmdl_parser.add_argument_group("download options")
@@ -77,7 +78,7 @@ if __name__ == "__main__":
     #         password = getpass.getpass("Password: ")
 
     try:
-        downloader = models.FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts, month_limit=cmdl_opts.month_limit, exclude_file=cmdl_opts.exclude_file, db_path=cmdl_opts.db_path)
+        downloader = models.FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts, month_limit=cmdl_opts.month_limit, exclude_file=cmdl_opts.exclude_file, db_path=cmdl_opts.db_path, db_bypass_post_check=cmdl_opts.db_bypass_post_check)
         if cmdl_opts.download_fanclubs:
             try:
                 downloader.download_followed_fanclubs(limit=cmdl_opts.limit)
