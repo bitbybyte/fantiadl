@@ -503,11 +503,6 @@ class FantiaDownloader:
 
     def download_post(self, post_id):
         """Download a post to its own directory."""
-        db_post = self.db.find_post(post_id)
-        if self.db.conn and db_post and db_post["download_complete"]:
-            self.output("Post {} already downloaded. Skipping...\n".format(post_id))
-            return
-
         self.output("Downloading post {}...\n".format(post_id))
 
         post_html_response = self.session.get(POST_URL.format(post_id))
@@ -529,7 +524,17 @@ class FantiaDownloader:
 
         post_posted_at = int(parsedate_to_datetime(post_json["posted_at"]).timestamp())
         post_converted_at = int(dt.fromisoformat(post_json["converted_at"]).timestamp()) if post_json["converted_at"] else post_posted_at
-        if self.db.conn and (not db_post or db_post["converted_at"] != post_converted_at):
+
+        db_post = self.db.find_post(post_id)
+        if self.db.conn and db_post and db_post["download_complete"]:
+            # Check if the post date changed, which may indicate new contents were added
+            if db_post["converted_at"] != post_converted_at:
+                self.output("Post date does not match date in database. Checking for new contents...\n")
+                self.db.update_post_download_complete(post_id, download_complete=0)
+            else:
+                self.output("Post appears to have been downloaded completely. Skipping...\n".format(post_id))
+                return
+        if self.db.conn and not db_post:
             self.db.insert_post(post_id, post_title, post_json["fanclub"]["id"], post_posted_at, post_converted_at)
 
         post_directory_title = sanitize_for_path(str(post_id))
