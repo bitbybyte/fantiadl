@@ -122,3 +122,6 @@ ENV/
 
 # Jetbrains
 .idea/
+
+# Database
+*.db
