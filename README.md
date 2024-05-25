@@ -15,7 +15,7 @@ options:
   -v, --version         show program's version number and exit
   --db DB_PATH          database to track post download state
   --db-bypass-post-check
-                        bypass the metadata fetch if post is marked as complete in the database
+                        bypass checking a post for new content if it's marked as completed on the database
 
 download options:
   -i, --ignore-errors   continue on download errors
@@ -43,7 +43,7 @@ download options:
                         file containing a list of filenames to exclude from downloading
 ```
 
-To track post downloads, specify a database path using `--db`, e.g. `--db ~/fantiadl.db`. When existing post content downloads are encountered, they will be skipped over. When all post contents under a parent post have been downloaded, the post will be marked complete on the database and skipped over entirely on future encounters.
+To track post downloads, specify a database path using `--db`, e.g. `--db ~/fantiadl.db`. When existing post content downloads are encountered, they will be skipped over. When all post contents under a parent post have been downloaded, the post will be marked complete on the database. If future requests to download a post indicate the post was modified based on its timestamp, new contents will be checked for; this behavior can be disabled by setting `--db-bypass-post-check`.
 
 When parsing for external links using `-x`, a .crawljob file is created in your root directory (either the directory provided with `-o` or the directory the script is being run from) that can be parsed by [JDownloader](http://jdownloader.org/). As posts are parsed, links will be appended and assigned their appropriate post directories for download. You can import this file manually into JDownloader (File -> Load Linkcontainer) or setup the Folder Watch plugin to watch your root directory for .crawljob files.
 
