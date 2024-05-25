@@ -13,7 +13,7 @@ options:
                         _session_id cookie or cookies.txt
   -q, --quiet           suppress output
   -v, --version         show program's version number and exit
-  --db DB_PATH          database to track post download state
+  --db DB_PATH          database to track post download state (creates tables when first specified)"
   --db-bypass-post-check
                         bypass checking a post for new content if it's marked as completed on the database
 
