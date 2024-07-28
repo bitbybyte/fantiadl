@@ -74,10 +74,12 @@ fantia.jp	FALSE	/	FALSE	1595755239	_session_id	a1b2c3d4...
 Only the `_session_id` cookie is required.
 
 ## Download
-Check the [releases page](https://github.com/bitbybyte/fantiadl/releases/latest) for the latest binaries.
+`pip install fantiadl`
+
+Binaries are also provided for [new releases](https://github.com/bitbybyte/fantiadl/releases/latest).
 
 ## Build Requirements
- - Python 3.x
+ - Python >=3.7
  - requests
  - beautifulsoup4
 
