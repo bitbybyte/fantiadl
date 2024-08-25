@@ -2,7 +2,7 @@
 Download media and other data from Fantia fanclubs and posts. A session cookie must be provided with the -c/--cookie argument directly or by passing the path to a legacy Netscape cookies file. Please see the [About Session Cookies](#about-session-cookies) section.
 
 ```
-usage: fantiadl.py [options] url
+usage: fantiadl [options] url
 
 positional arguments:
   url                   fanclub or post URL
@@ -75,6 +75,7 @@ Only the `_session_id` cookie is required.
 
 ## Download
 `pip install fantiadl`
+https://pypi.org/project/fantiadl/
 
 Binaries are also provided for [new releases](https://github.com/bitbybyte/fantiadl/releases/latest).
 
