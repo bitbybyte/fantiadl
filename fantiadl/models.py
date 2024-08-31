@@ -44,7 +44,7 @@ POST_URL = "https://fantia.jp/posts/{}"
 POSTS_URL = "https://fantia.jp/posts"
 POST_RELATIVE_URL = "/posts/"
 
-TIMELINES_API = "https://fantia.jp/api/v1/me/timelines/posts?page={}&per=24"
+TIMELINES_API = "https://fantia.jp/api/v1/me/timelines/posts?page={}&per=24{}"
 
 USER_AGENT = "fantiadl/{}".format(__version__)
 
@@ -293,15 +293,15 @@ class FantiaDownloader:
                 else:
                     raise
 
-    def download_new_posts(self, post_limit=24):
+    def download_new_posts(self, post_limit=24, paid_only=False):
         all_new_post_ids = []
         total_pages = math.ceil(post_limit / 24)
         page_number = 1
         has_next = True
-        self.output("Downloading {} new posts...\n".format(post_limit))
+        self.output("Downloading {} new{} posts...\n".format(post_limit, " paid" if paid_only else ""))
 
         while has_next and not len(all_new_post_ids) >= post_limit:
-            response = self.session.get(TIMELINES_API.format(page_number))
+            response = self.session.get(TIMELINES_API.format(page_number, "&free_plan=not_free" if paid_only else ""))
             response.raise_for_status()
             json_response = json.loads(response.text)
 
