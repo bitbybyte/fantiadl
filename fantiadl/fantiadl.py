@@ -43,7 +43,7 @@ dl_group.add_argument("-x", "--parse-for-external-links", action="store_true", d
 dl_group.add_argument("-t", "--download-thumbnail", action="store_true", dest="download_thumb", help="download post thumbnails")
 dl_group.add_argument("-f", "--download-fanclubs", action="store_true", dest="download_fanclubs", help="download posts from all followed fanclubs")
 dl_group.add_argument("-p", "--download-paid-fanclubs", action="store_true", dest="download_paid_fanclubs", help="download posts from all fanclubs backed on a paid plan")
-dl_group.add_argument("-n", "--download-new-posts", dest="download_new_posts", metavar="#", type=int, help="download a specified number of new posts from your fanclub timeline")
+dl_group.add_argument("-n", "--download-new-posts", dest="download_new_posts", metavar="#", type=int, help="download a specified number of new posts from your fanclub timeline. specify -p to only download paid fanclubs")
 dl_group.add_argument("-d", "--download-month", dest="month_limit", metavar="%Y-%m", help="download posts only from a specific month, e.g. 2007-08 (excludes -n)")
 dl_group.add_argument("--exclude", dest="exclude_file", metavar="EXCLUDE_FILE", help="file containing a list of filenames to exclude from downloading")
 
@@ -60,6 +60,10 @@ def main():
 
     if not (cmdl_opts.download_fanclubs or cmdl_opts.download_paid_fanclubs or cmdl_opts.download_new_posts) and not cmdl_opts.url:
         sys.exit("Error: No valid input provided")
+    if cmdl_opts.download_new_posts and cmdl_opts.download_fanclubs:
+        sys.exit("Error: -n/--download-new-posts and -f/--download-fanclubs are mutually exclusive. Please specify only one of these flags.")
+    if cmdl_opts.download_fanclubs and cmdl_opts.download_paid_fanclubs:
+        sys.exit("Error: -f/--download-fanclubs and -p/--download-paid-fanclubs are mutually exclusive")
 
     if not session_arg:
         session_arg = input("Fantia session cookie (_session_id or cookies.txt path): ")
@@ -79,38 +83,26 @@ def main():
 
     try:
         downloader = FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts, month_limit=cmdl_opts.month_limit, exclude_file=cmdl_opts.exclude_file, db_path=cmdl_opts.db_path, db_bypass_post_check=cmdl_opts.db_bypass_post_check)
-        if cmdl_opts.download_fanclubs:
-            try:
+
+        # Download based on flags
+        try:
+            if cmdl_opts.download_new_posts:
+                downloader.download_new_posts(post_limit=cmdl_opts.download_new_posts, paid_only=cmdl_opts.download_paid_fanclubs)
+            elif cmdl_opts.download_fanclubs:
                 downloader.download_followed_fanclubs(limit=cmdl_opts.limit)
-            except KeyboardInterrupt:
-                raise
-            except:
-                if cmdl_opts.continue_on_error:
-                    downloader.output("Encountered an error downloading followed fanclubs. Skipping...\n")
-                    traceback.print_exc()
-                    pass
-                else:
-                    raise
-        elif cmdl_opts.download_paid_fanclubs:
-            try:
+            elif cmdl_opts.download_paid_fanclubs:
                 downloader.download_paid_fanclubs(limit=cmdl_opts.limit)
-            except:
-                if cmdl_opts.continue_on_error:
-                    downloader.output("Encountered an error downloading paid fanclubs. Skipping...\n")
-                    traceback.print_exc()
-                    pass
-                else:
-                    raise
-        elif cmdl_opts.download_new_posts:
-            try:
-                downloader.download_new_posts(post_limit=cmdl_opts.download_new_posts)
-            except:
-                if cmdl_opts.continue_on_error:
-                    downloader.output("Encountered an error downloading new posts from timeline. Skipping...\n")
-                    traceback.print_exc()
-                    pass
-                else:
-                    raise
+        except KeyboardInterrupt:
+            raise
+        except:
+            if cmdl_opts.continue_on_error:
+                downloader.output("Encountered an error downloading fanclubs. Skipping...\n")
+                traceback.print_exc()
+                pass
+            else:
+                raise
+
+        # Download any additional URLs provided
         if cmdl_opts.url:
             for url in cmdl_opts.url:
                     url_match = FANTIA_URL_RE.match(url)
