@@ -61,7 +61,7 @@ def main():
     if not (cmdl_opts.download_fanclubs or cmdl_opts.download_paid_fanclubs or cmdl_opts.download_new_posts) and not cmdl_opts.url:
         sys.exit("Error: No valid input provided")
     if cmdl_opts.download_new_posts and cmdl_opts.download_fanclubs:
-        sys.exit("Error: -n/--download-new-posts and -f/--download-fanclubs are mutually exclusive")
+        sys.exit("Error: -n/--download-new-posts and -f/--download-fanclubs are mutually exclusive. Please specify only one of these flags.")
     if cmdl_opts.download_fanclubs and cmdl_opts.download_paid_fanclubs:
         sys.exit("Error: -f/--download-fanclubs and -p/--download-paid-fanclubs are mutually exclusive")
 
