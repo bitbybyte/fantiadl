@@ -2,10 +2,8 @@
 # -*- coding: utf-8 -*-
 """Download media and other data from Fantia"""
 
-import argparse
-import getpass
-import netrc
 import sys
+import argparse
 import traceback
 
 from .models import FantiaDownloader, FantiaClub, FANTIA_URL_RE
@@ -18,7 +16,7 @@ __license__ = "MIT"
 
 BASE_HOST = "fantia.jp"
 
-cmdl_usage = "%(prog)s [options] url"
+cmdl_usage = "%(prog)s [options] [url]"
 cmdl_version = __version__
 cmdl_parser = argparse.ArgumentParser(usage=cmdl_usage, conflict_handler="resolve")
 
@@ -46,9 +44,12 @@ dl_group.add_argument("-p", "--download-paid-fanclubs", action="store_true", des
 dl_group.add_argument("-n", "--download-new-posts", dest="download_new_posts", metavar="#", type=int, help="download a specified number of new posts from your fanclub timeline")
 dl_group.add_argument("-d", "--download-month", dest="month_limit", metavar="%Y-%m", help="download posts only from a specific month, e.g. 2007-08 (excludes -n)")
 dl_group.add_argument("--exclude", dest="exclude_file", metavar="EXCLUDE_FILE", help="file containing a list of filenames to exclude from downloading")
+dl_group.add_argument("--delay", dest="delay", type=float, default=1.5, help="Random delay range between requests (seconds), Set 0 to disable. Default: 1.5")
+dl_group.add_argument("--retry-wait", dest="retry_wait", type=int, default=180, help="Wait time for errors (seconds), Default: 180")
 
 
 cmdl_opts = cmdl_parser.parse_args()
+
 
 def main():
     session_arg = cmdl_opts.session_arg
@@ -78,7 +79,7 @@ def main():
     #         password = getpass.getpass("Password: ")
 
     try:
-        downloader = FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts, month_limit=cmdl_opts.month_limit, exclude_file=cmdl_opts.exclude_file, db_path=cmdl_opts.db_path, db_bypass_post_check=cmdl_opts.db_bypass_post_check)
+        downloader = FantiaDownloader(session_arg=session_arg, dump_metadata=cmdl_opts.dump_metadata, parse_for_external_links=cmdl_opts.parse_for_external_links, download_thumb=cmdl_opts.download_thumb, directory=cmdl_opts.output_path, quiet=cmdl_opts.quiet, continue_on_error=cmdl_opts.continue_on_error, use_server_filenames=cmdl_opts.use_server_filenames, mark_incomplete_posts=cmdl_opts.mark_incomplete_posts, month_limit=cmdl_opts.month_limit, exclude_file=cmdl_opts.exclude_file, db_path=cmdl_opts.db_path, db_bypass_post_check=cmdl_opts.db_bypass_post_check, delay=cmdl_opts.delay, retry_wait=cmdl_opts.retry_wait)
         if cmdl_opts.download_fanclubs:
             try:
                 downloader.download_followed_fanclubs(limit=cmdl_opts.limit)
@@ -113,26 +114,26 @@ def main():
                     raise
         if cmdl_opts.url:
             for url in cmdl_opts.url:
-                    url_match = FANTIA_URL_RE.match(url)
-                    if url_match:
-                        try:
-                            url_groups = url_match.groups()
-                            if url_groups[0] == "fanclubs":
-                                fanclub = FantiaClub(url_groups[1])
-                                downloader.download_fanclub(fanclub, cmdl_opts.limit)
-                            elif url_groups[0] == "posts":
-                                downloader.download_post(url_groups[1])
-                        except KeyboardInterrupt:
+                url_match = FANTIA_URL_RE.match(url)
+                if url_match:
+                    try:
+                        url_groups = url_match.groups()
+                        if url_groups[0] == "fanclubs":
+                            fanclub = FantiaClub(url_groups[1])
+                            downloader.download_fanclub(fanclub, cmdl_opts.limit)
+                        elif url_groups[0] == "posts":
+                            downloader.download_post(url_groups[1])
+                    except KeyboardInterrupt:
+                        raise
+                    except:
+                        if cmdl_opts.continue_on_error:
+                            downloader.output("Encountered an error downloading URL. Skipping...\n")
+                            traceback.print_exc()
+                            continue
+                        else:
                             raise
-                        except:
-                            if cmdl_opts.continue_on_error:
-                                downloader.output("Encountered an error downloading URL. Skipping...\n")
-                                traceback.print_exc()
-                                continue
-                            else:
-                                raise
-                    else:
-                        sys.stderr.write("Error: {} is not a valid URL. Please provide a fully qualified Fantia URL (https://fantia.jp/posts/[id], https://fantia.jp/fanclubs/[id])\n".format(url))
+                else:
+                    sys.stderr.write("Error: {} is not a valid URL. Please provide a fully qualified Fantia URL (https://fantia.jp/posts/[id], https://fantia.jp/fanclubs/[id])\n".format(url))
     except KeyboardInterrupt:
         sys.exit("Interrupted by user. Exiting...")
 
@@ -141,6 +142,7 @@ def cli():
     global cmdl_opts
     cmdl_opts = cmdl_parser.parse_args()
     main()
+
 
 if __name__ == "__main__":
     cli()

@@ -1,4 +1,5 @@
 # FantiaDL
+
 Download media and other data from Fantia fanclubs and posts. A session cookie must be provided with the -c/--cookie argument directly or by passing the path to a legacy Netscape cookies file. Please see the [About Session Cookies](#about-session-cookies) section.
 
 ```
@@ -41,6 +42,9 @@ download options:
                         download posts only from a specific month, e.g. 2007-08 (excludes -n)
   --exclude EXCLUDE_FILE
                         file containing a list of filenames to exclude from downloading
+  --delay DELAY         Random delay range between requests (seconds), Set 0 to disable. Default: 3
+  --retry-wait RETRY_WAIT
+                        Wait time for errors (seconds), Default: 180
 ```
 
 To track post downloads, specify a database path using `--db`, e.g. `--db ~/fantiadl.db`. When existing post content downloads are encountered, they will be skipped over. When all post contents under a parent post have been downloaded, the post will be marked complete on the database. If future requests to download a post indicate the post was modified based on its timestamp, new contents will be checked for; this behavior can be disabled by setting `--db-bypass-post-check`.
@@ -48,19 +52,23 @@ To track post downloads, specify a database path using `--db`, e.g. `--db ~/fant
 When parsing for external links using `-x`, a .crawljob file is created in your root directory (either the directory provided with `-o` or the directory the script is being run from) that can be parsed by [JDownloader](http://jdownloader.org/). As posts are parsed, links will be appended and assigned their appropriate post directories for download. You can import this file manually into JDownloader (File -> Load Linkcontainer) or setup the Folder Watch plugin to watch your root directory for .crawljob files.
 
 ## About Session Cookies
+
 Due to recent changes imposed by Fantia, providing an email and password to login from the command line is no longer supported. In order to login, you will need to provide the `_session_id` cookie for your Fantia login session using -c/--cookie. After logging in normally on your browser, this value can then be extracted and used with FantiaDL. This value expires and may need to be updated with some regularity.
 
 ### Mozilla Firefox
+
 1. On https://fantia.jp, press Ctrl + Shift + I to open Developer Tools.
 2. Select the Storage tab at the top. In the sidebar, select https://fantia.jp under the Cookies heading.
 3. Locate the `_session_id` cookie name. Click on the value to copy it.
 
 ### Google Chrome
+
 1. On https://fantia.jp, press Ctrl + Shift + I to open DevTools.
 2. Select the Application tab at the top. In the sidebar, expand Cookies under the Storage heading and select https://fantia.jp.
 3. Locate the `_session_id` cookie name. Click on the value to copy it.
 
 ### Third-Party Extensions (cookies.txt)
+
 You also have the option of passing the path to a legacy Netscape format cookies file with -c/--cookie, e.g. `-c ~/cookies.txt`. Using an extension like [cookies.txt](https://chrome.google.com/webstore/detail/cookiestxt/njabckikapfpffapmjgojcnbfjonfjfg), create a text file matching the accepted format:
 
 ```
@@ -74,15 +82,18 @@ fantia.jp	FALSE	/	FALSE	1595755239	_session_id	a1b2c3d4...
 Only the `_session_id` cookie is required.
 
 ## Download
+
 `pip install fantiadl`
 https://pypi.org/project/fantiadl/
 
 Binaries are also provided for [new releases](https://github.com/bitbybyte/fantiadl/releases/latest).
 
 ## Build Requirements
- - Python >=3.7
- - requests
- - beautifulsoup4
+
+- Python >=3.7
+- requests
+- beautifulsoup4
 
 ## Roadmap
- - More robust logging
+
+- More robust logging

@@ -12,12 +12,12 @@ from urllib.parse import urljoin
 from urllib.parse import urlparse
 import http.cookiejar
 import json
-import math
 import mimetypes
 import os
 import re
 import sys
 import time
+import random
 import traceback
 
 from .__version__ import __version__
@@ -55,7 +55,7 @@ MIMETYPES = {
     "image/png": ".png",
     "image/gif": ".gif",
     "video/mp4": ".mp4",
-    "video/webm": ".webm"
+    "video/webm": ".webm",
 }
 
 UNICODE_CONTROL_MAP = dict.fromkeys(range(32))
@@ -67,7 +67,25 @@ class FantiaClub:
 
 
 class FantiaDownloader:
-    def __init__(self, session_arg, chunk_size=1024 * 1024 * 5, dump_metadata=False, parse_for_external_links=False, download_thumb=False, directory=None, quiet=True, continue_on_error=False, use_server_filenames=False, mark_incomplete_posts=False, month_limit=None, exclude_file=None, db_path=None, db_bypass_post_check=False):
+    def __init__(
+        self,
+        session_arg,
+        chunk_size=1024 * 1024 * 5,
+        dump_metadata=False,
+        parse_for_external_links=False,
+        download_thumb=False,
+        directory=None,
+        quiet=True,
+        continue_on_error=False,
+        use_server_filenames=False,
+        mark_incomplete_posts=False,
+        month_limit=None,
+        exclude_file=None,
+        db_path=None,
+        db_bypass_post_check=False,
+        delay=1,
+        retry_wait=180,
+    ):
         # self.email = email
         # self.password = password
         self.session_arg = session_arg
@@ -85,6 +103,10 @@ class FantiaDownloader:
         self.exclusions = []
         self.db = FantiaDlDatabase(db_path)
         self.db_bypass_post_check = db_bypass_post_check
+        # +++ Add new instance variables +++
+        self.delay = delay
+        self.retry_wait = retry_wait
+        self.consecutive_429 = 0  # Track consecutive 429 errors
 
         self.initialize_session()
         self.login()
@@ -109,9 +131,9 @@ class FantiaDownloader:
             total=5,
             connect=5,
             read=5,
-            status_forcelist=[429, 500, 502, 503, 504, 507, 508],
-            backoff_factor=2, # retry delay = {backoff factor} * (2 ** ({retry number} - 1))
-            raise_on_status=True
+            status_forcelist=[500, 502, 503, 504, 507, 508],  # Removed 429
+            backoff_factor=2,  # retry delay = {backoff factor} * (2 ** ({retry number} - 1))
+            raise_on_status=True,
         )
         self.session.mount("http://", HTTPAdapter(max_retries=retries))
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
@@ -124,7 +146,9 @@ class FantiaDownloader:
                 cookies.load()
                 self.session.cookies = cookies
         except FileNotFoundError:
-            login_cookie = requests.cookies.create_cookie(domain=DOMAIN, name="_session_id", value=self.session_arg)
+            login_cookie = requests.cookies.create_cookie(
+                domain=DOMAIN, name="_session_id", value=self.session_arg
+            )
             self.session.cookies.set_cookie(login_cookie)
 
         check_user = self.session.get(ME_API)
@@ -189,6 +213,43 @@ class FantiaDownloader:
             post_titles.append(title)
 
         return post_titles
+
+    def safe_request(self, method, url, **kwargs):
+        # Download Delay
+        dl_delay = random.random() * self.delay
+        print("Wait {:.2f} s...".format(dl_delay))
+        time.sleep(dl_delay)
+
+        for attempt in range(3):
+            try:
+                response = self.session.request(method, url, **kwargs)
+
+                # Handle 429 errors
+                if response.status_code == 429:
+                    self.consecutive_429 += 1
+                    self.output(f"HTTP 429 Too Many Requests (attempt {self.consecutive_429}/3)\n")
+
+                    if self.consecutive_429 >= 3:
+                        self.output("Three consecutive 429 errors detected.\n")
+                        choice = input("Continue waiting? (y/n): ").lower()
+                        if choice != "y":
+                            raise SystemExit("Aborted by user")
+                        self.consecutive_429 = 0  # Reset counter
+
+                    self.output("Wait {:.2f} s...\n".format(self.retry_wait))
+                    time.sleep(self.retry_wait)
+                    continue
+
+                self.consecutive_429 = 0  # Reset counter on success
+                response.raise_for_status()
+                return response
+
+            except requests.exceptions.RetryError as e:
+                if attempt == 2:  # Final attempt
+                    raise Exception(f"Request failed after 3 attempts: {str(e)}")
+                continue
+
+        raise Exception("Max retries exceeded")
 
     def download_fanclub_metadata(self, fanclub):
         """Download fanclub header, icon, and custom background."""
@@ -270,7 +331,7 @@ class FantiaDownloader:
             response = self.session.get(FANCLUBS_PAID_HTML.format(page_number))
             response.raise_for_status()
             response_page = BeautifulSoup(response.text, "html.parser")
-            fanclub_links = response_page.select("div.mb-5-children > div:nth-of-type(1) a[href^=\"/fanclubs\"]")
+            fanclub_links = response_page.select('div.mb-5-children > div:nth-of-type(1) a[href^="/fanclubs"]')
 
             for fanclub_link in fanclub_links:
                 fanclub_id = fanclub_link["href"].lstrip("/fanclubs/")
@@ -295,13 +356,12 @@ class FantiaDownloader:
 
     def download_new_posts(self, post_limit=24):
         all_new_post_ids = []
-        total_pages = math.ceil(post_limit / 24)
         page_number = 1
         has_next = True
         self.output("Downloading {} new posts...\n".format(post_limit))
 
         while has_next and not len(all_new_post_ids) >= post_limit:
-            response = self.session.get(TIMELINES_API.format(page_number))
+            response = self.safe_request("GET", TIMELINES_API.format(page_number))
             response.raise_for_status()
             json_response = json.loads(response.text)
 
@@ -342,13 +402,17 @@ class FantiaDownloader:
             for post in posts:
                 link = post.select_one("a.link-block")["href"]
                 post_id = link.lstrip(POST_RELATIVE_URL)
-                date_string = post.select_one(".post-date .mr-5").text if post.select_one(".post-date .mr-5") else post.select_one(".post-date").text
+                date_string = (
+                    post.select_one(".post-date .mr-5").text
+                    if post.select_one(".post-date .mr-5")
+                    else post.select_one(".post-date").text
+                )
                 parsed_date = dt.strptime(date_string, "%Y-%m-%d %H:%M")
                 if not self.month_limit or (parsed_date.year == self.month_limit.year and parsed_date.month == self.month_limit.month):
                     post_found = True
                     new_post_ids.append(post_id)
             all_posts += new_post_ids
-            if not posts or (not new_post_ids and post_found): # No new posts found and we've already collected a post
+            if not posts or (not new_post_ids and post_found):  # No new posts found and we've already collected a post
                 self.output("Collected {} posts.\n".format(len(all_posts)))
                 return all_posts
             else:
@@ -374,7 +438,7 @@ class FantiaDownloader:
             self.output("URL already downloaded. Skipping...\n")
             return
 
-        request = self.session.get(url, stream=True)
+        request = self.safe_request("GET", url, stream=True)
         if request.status_code == 404:
             self.output("Download URL returned 404. Skipping...\n")
             return
@@ -433,12 +497,16 @@ class FantiaDownloader:
     def download_photo(self, photo_url, photo_counter, gallery_directory):
         """Download a photo to the post's directory."""
         extension = self.process_content_type(photo_url)
-        filename = os.path.join(gallery_directory, str(photo_counter) + extension) if gallery_directory else str()
+        filename = (
+            os.path.join(gallery_directory, str(photo_counter) + extension)
+            if gallery_directory
+            else str()
+        )
         self.perform_download(photo_url, filename, use_server_filename=self.use_server_filenames)
 
     def download_file(self, download_url, filename, post_directory):
         """Download a file to the post's directory."""
-        self.perform_download(download_url, filename, use_server_filename=True) # Force serve filenames to prevent duplicate collision
+        self.perform_download(download_url, filename, use_server_filename=True)  # Force serve filenames to prevent duplicate collision
 
     def download_post_content(self, post_json, post_directory, post_title):
         """Parse the post's content to determine whether to save the content as a photo gallery or file."""
@@ -484,10 +552,17 @@ class FantiaDownloader:
                         self.download_photo(photo_url, photo_counter, gallery_directory)
                         photo_counter += 1
             else:
-                self.output("Post content category \"{}\" is not supported. Skipping...\n".format(post_json.get("category")))
+                self.output('Post content category "{}" is not supported. Skipping...\n'.format(post_json.get("category")))
                 return False
 
-        self.db.insert_post_content(post_json["id"], post_json["parent_post"]["url"].rsplit("/", 1)[1], post_json["title"], post_json["category"], post_json["foreign_plan_price"], post_json["currency_code"])
+        self.db.insert_post_content(
+            post_json["id"],
+            post_json["parent_post"]["url"].rsplit("/", 1)[1],
+            post_json["title"],
+            post_json["category"],
+            post_json["foreign_plan_price"],
+            post_json["currency_code"],
+        )
 
         if self.parse_for_external_links:
             post_description = post_json["comment"] or ""
@@ -504,7 +579,7 @@ class FantiaDownloader:
     def download_post(self, post_id):
         """Download a post to its own directory."""
         db_post = self.db.find_post(post_id)
-        if self.db_bypass_post_check and self.db.conn and db_post and db_post["download_complete"]:
+        if (self.db_bypass_post_check and self.db.conn and db_post and db_post["download_complete"]):
             self.output("Post {} already downloaded. Skipping...\n".format(post_id))
             return
 
@@ -513,12 +588,9 @@ class FantiaDownloader:
         post_html_response = self.session.get(POST_URL.format(post_id))
         post_html_response.raise_for_status()
         post_html = BeautifulSoup(post_html_response.text, "html.parser")
-        csrf_token = post_html.select_one("meta[name=\"csrf-token\"]")["content"]
+        csrf_token = post_html.select_one('meta[name="csrf-token"]')["content"]
 
-        response = self.session.get(POST_API.format(post_id), headers={
-            "X-CSRF-Token": csrf_token,
-            "X-Requested-With": "XMLHttpRequest"
-        })
+        response = self.safe_request("GET", POST_API.format(post_id), headers={"X-CSRF-Token": csrf_token, "X-Requested-With": "XMLHttpRequest"})
         response.raise_for_status()
         post_json = json.loads(response.text)["post"]
 
@@ -528,7 +600,11 @@ class FantiaDownloader:
         post_contents = post_json["post_contents"]
 
         post_posted_at = int(parsedate_to_datetime(post_json["posted_at"]).timestamp())
-        post_converted_at = int(dt.fromisoformat(post_json["converted_at"]).timestamp()) if post_json["converted_at"] else post_posted_at
+        post_converted_at = (
+            int(dt.fromisoformat(post_json["converted_at"]).timestamp())
+            if post_json["converted_at"]
+            else post_posted_at
+        )
 
         if self.db.conn and db_post and db_post["download_complete"]:
             # Check if the post date changed, which may indicate new contents were added
@@ -537,10 +613,16 @@ class FantiaDownloader:
                 self.db.update_post_download_complete(post_id, download_complete=0)
                 self.db.update_post_converted_at(post_id, post_converted_at)
             else:
-                self.output("Post appears to have been downloaded completely. Skipping...\n".format(post_id))
+                self.output("Post {} appears to have been downloaded completely. Skipping...\n".format(post_id))
                 return
         if self.db.conn and not db_post:
-            self.db.insert_post(post_id, post_title, post_json["fanclub"]["id"], post_posted_at, post_converted_at)
+            self.db.insert_post(
+                post_id,
+                post_title,
+                post_json["fanclub"]["id"],
+                post_posted_at,
+                post_converted_at,
+            )
 
         post_directory_title = sanitize_for_path(str(post_id))
 
@@ -583,7 +665,7 @@ class FantiaDownloader:
     def save_metadata(self, metadata, directory):
         """Save the metadata for a post to the post's directory."""
         filename = os.path.join(directory, "metadata.json")
-        with open(filename, "w", encoding='utf-8') as file:
+        with open(filename, "w", encoding="utf-8") as file:
             json.dump(metadata, file, sort_keys=True, ensure_ascii=False, indent=4)
 
     def mark_incomplete_post(self, post_metadata, post_directory):
@@ -596,7 +678,7 @@ class FantiaDownloader:
                 break
         if is_incomplete:
             if not os.path.exists(incomplete_filename):
-                open(incomplete_filename, 'a').close()
+                open(incomplete_filename, "a").close()
         else:
             if os.path.exists(incomplete_filename):
                 os.remove(incomplete_filename)
@@ -616,11 +698,13 @@ def guess_extension(mimetype, download_url):
             extension = ".unknown"
     return extension
 
-def sanitize_for_path(value, replace=' '):
+
+def sanitize_for_path(value, replace=" "):
     """Remove potentially illegal characters from a path."""
-    sanitized = re.sub(r'[<>\"\?\\\/\*:|]', replace, value)
+    sanitized = re.sub(r"[<>\"\?\\\/\*:|]", replace, value)
     sanitized = sanitized.translate(UNICODE_CONTROL_MAP)
-    return re.sub(r'[\s.]+$', '', sanitized)
+    return re.sub(r"[\s.]+$", "", sanitized)
+
 
 def build_crawljob(links, root_directory, post_directory):
     """Append to a root .crawljob file with external links gathered from a post."""
@@ -636,7 +720,7 @@ def build_crawljob(links, root_directory, post_directory):
                 "forcedStart": "true",
                 "autoConfirm": "true",
                 "addOfflineLink": "true",
-                "extractAfterDownload": "false"
+                "extractAfterDownload": "false",
             }
 
             for key, value in crawl_dict.items():
